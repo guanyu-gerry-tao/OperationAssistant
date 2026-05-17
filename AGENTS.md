@@ -22,6 +22,8 @@
 
 ## Change Management
 
+- Do not do implementation work directly on `main`.
+- Work on a feature, milestone, or fix branch. Reusing the current milestone branch is fine; creating a new branch for every tiny step is not required.
 - Commit by logical step, not by arbitrary time slices.
 - Create PRs by milestone.
 - Prefer one Codex goal per milestone when using goal-based execution.
