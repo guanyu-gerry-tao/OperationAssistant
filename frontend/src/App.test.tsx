@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe("App", () => {
   it("renders incidents returned by the API", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         incidents: [
@@ -30,12 +30,14 @@ describe("App", () => {
           }
         ],
       }),
-    }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
 
     const incidentList = screen.getByLabelText("Curated incidents");
     expect(await within(incidentList).findByText("API supplied incident")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/incidents");
     const detailPanel = screen.getByLabelText("Incident detail");
     expect(within(detailPanel).getByText("api contract")).toBeInTheDocument();
   });

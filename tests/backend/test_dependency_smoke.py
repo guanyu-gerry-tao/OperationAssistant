@@ -9,6 +9,35 @@ from backend.app.config import get_settings
 from backend.app.main import app
 
 
+EXPECTED_TABLE_COLUMNS = {
+    "incidents": {
+        "id": ("text", "NO"),
+        "title": ("text", "NO"),
+        "severity": ("text", "NO"),
+        "service": ("text", "NO"),
+        "symptom": ("text", "NO"),
+        "customer_impact": ("text", "NO"),
+        "likely_area": ("text", "NO"),
+        "status": ("text", "NO"),
+        "started_at": ("timestamp with time zone", "NO"),
+    },
+    "runbook_metadata": {
+        "id": ("text", "NO"),
+        "title": ("text", "NO"),
+        "service": ("text", "NO"),
+        "source_path": ("text", "NO"),
+        "incident_pattern": ("text", "NO"),
+    },
+    "tool_sample_records": {
+        "id": ("text", "NO"),
+        "incident_id": ("text", "NO"),
+        "tool_name": ("text", "NO"),
+        "record_type": ("text", "NO"),
+        "payload": ("jsonb", "NO"),
+    },
+}
+
+
 @pytest.fixture(autouse=True)
 def clear_settings_cache() -> None:
     """Clear cached settings so dependency smoke tests read fresh environment values."""
@@ -33,7 +62,7 @@ def test_health_reports_ok_for_real_postgres_and_redis() -> None:
     }
 
 
-def test_foundation_migration_matches_incident_seed_shape() -> None:
+def test_foundation_migration_matches_seed_table_shapes() -> None:
     database_url = os.getenv("OA_DATABASE_URL")
     if database_url is None:
         pytest.skip("Migration smoke test requires OA_DATABASE_URL.")
@@ -44,13 +73,40 @@ def test_foundation_migration_matches_incident_seed_shape() -> None:
         connection.execute(migration_sql)
         rows = connection.execute(
             """
-            SELECT column_name
+            SELECT table_name, column_name, data_type, is_nullable
             FROM information_schema.columns
-            WHERE table_name = 'incidents'
-            ORDER BY ordinal_position
+            WHERE table_name = ANY(%s)
+            ORDER BY table_name, ordinal_position
+            """,
+            (list(EXPECTED_TABLE_COLUMNS.keys()),),
+        ).fetchall()
+        foreign_key_rows = connection.execute(
+            """
+            SELECT
+                tc.table_name,
+                kcu.column_name,
+                ccu.table_name AS foreign_table_name,
+                ccu.column_name AS foreign_column_name
+            FROM information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+                ON tc.constraint_name = kcu.constraint_name
+            JOIN information_schema.constraint_column_usage AS ccu
+                ON ccu.constraint_name = tc.constraint_name
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_name = 'tool_sample_records'
             """
         ).fetchall()
 
-    column_names = [row[0] for row in rows]
-    assert "customer_impact" in column_names
-    assert "likely_area" in column_names
+    columns_by_table = {
+        table_name: {
+            column_name: (data_type, is_nullable)
+            for row_table_name, column_name, data_type, is_nullable in rows
+            if row_table_name == table_name
+        }
+        for table_name in EXPECTED_TABLE_COLUMNS
+    }
+    for table_name, expected_columns in EXPECTED_TABLE_COLUMNS.items():
+        for column_name, expected_contract in expected_columns.items():
+            assert columns_by_table[table_name][column_name] == expected_contract
+
+    assert ("tool_sample_records", "incident_id", "incidents", "id") in foreign_key_rows

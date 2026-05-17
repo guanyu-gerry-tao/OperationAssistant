@@ -6,6 +6,17 @@ from backend.app.main import app
 
 
 client = TestClient(app)
+EXPECTED_INCIDENT_FIELDS = {
+    "id",
+    "title",
+    "severity",
+    "service",
+    "status",
+    "started_at",
+    "symptom",
+    "customer_impact",
+    "likely_area",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +71,7 @@ def test_seed_incidents_endpoint_returns_all_curated_incidents() -> None:
     incidents = body["incidents"]
     incident_ids = [incident["id"] for incident in incidents]
     assert incident_ids == ["INC-1001", "INC-1002", "INC-1003"]
-    assert all("symptom" in incident for incident in incidents)
+    assert all(EXPECTED_INCIDENT_FIELDS.issubset(set(incident)) for incident in incidents)
 
 
 def test_incident_detail_includes_placeholder_investigation_for_known_incident() -> None:
