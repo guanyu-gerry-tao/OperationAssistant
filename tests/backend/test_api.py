@@ -29,6 +29,7 @@ def clear_settings_cache() -> None:
 
 
 def test_health_returns_not_configured_when_dependencies_are_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Remove dependency URLs so the health endpoint exercises the bootstrap state.
     monkeypatch.delenv("OA_DATABASE_URL", raising=False)
     monkeypatch.delenv("OA_REDIS_URL", raising=False)
 
@@ -48,6 +49,7 @@ def test_health_returns_not_configured_when_dependencies_are_missing(monkeypatch
 def test_health_returns_unavailable_when_dependencies_cannot_be_reached(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Point both dependencies at closed local ports so the API reports unavailable.
     monkeypatch.setenv(
         "OA_DATABASE_URL",
         "postgresql://operation_assistant:operation_assistant@127.0.0.1:1/operation_assistant",
@@ -66,6 +68,7 @@ def test_health_returns_unavailable_when_dependencies_cannot_be_reached(
 def test_seed_incidents_endpoint_returns_all_curated_incidents() -> None:
     response = client.get("/api/incidents")
 
+    # The endpoint should return all curated incidents with the fields the UI needs.
     assert response.status_code == 200
     body = response.json()
     incidents = body["incidents"]
@@ -77,6 +80,7 @@ def test_seed_incidents_endpoint_returns_all_curated_incidents() -> None:
 def test_incident_detail_includes_placeholder_investigation_for_known_incident() -> None:
     response = client.get("/api/incidents/INC-1001")
 
+    # A known incident includes both seed details and the honest M1 placeholder.
     assert response.status_code == 200
     body = response.json()
     assert body["incident"]["id"] == "INC-1001"
@@ -87,5 +91,6 @@ def test_incident_detail_includes_placeholder_investigation_for_known_incident()
 def test_incident_detail_returns_not_found_for_unknown_incident() -> None:
     response = client.get("/api/incidents/INC-9999")
 
+    # Unknown seed ids should be translated into the public HTTP error contract.
     assert response.status_code == 404
     assert response.json() == {"detail": "Incident not found"}

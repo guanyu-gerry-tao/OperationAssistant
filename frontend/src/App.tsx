@@ -36,20 +36,24 @@ export default function App() {
   const [selectedIncidentId, setSelectedIncidentId] = useState(seedIncidents[0].id);
 
   useEffect(() => {
+    // Replace bundled demo data with API data when the backend is available.
     void fetchIncidents().then((nextIncidents) => {
       setIncidents(nextIncidents);
       if (nextIncidents.length > 0) {
+        // Select the first API incident so the detail panel stays in sync with the list.
         setSelectedIncidentId(nextIncidents[0].id);
       }
     });
   }, []);
 
   const selectedIncident = useMemo(() => {
+    // Re-resolve the selected incident whenever the list or selected id changes.
     const match = incidents.find((incident) => incident.id === selectedIncidentId);
     if (match !== undefined) {
       return match;
     }
 
+    // Fall back to the first row if the current id disappeared after an API refresh.
     return incidents[0];
   }, [incidents, selectedIncidentId]);
 
@@ -62,6 +66,7 @@ export default function App() {
     );
   }
 
+  // M1 computes the placeholder locally because retrieval has not been implemented yet.
   const investigation = buildPlaceholderInvestigation(selectedIncident);
 
   return (

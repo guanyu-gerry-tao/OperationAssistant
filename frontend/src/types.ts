@@ -1,3 +1,4 @@
+/** Curated incident record shown in the M1 investigation workspace. */
 export type Incident = {
   id: string;
   title: string;
@@ -10,6 +11,7 @@ export type Incident = {
   likely_area: string;
 };
 
+/** Static M1 investigation summary used before retrieval and tool calls exist. */
 export type Investigation = {
   status: string;
   summary: string;

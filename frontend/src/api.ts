@@ -1,5 +1,6 @@
 import type { Incident } from "./types";
 
+// Keep a bundled copy of the seed incidents so the UI works before the API is running.
 export const seedIncidents: Incident[] = [
   {
     id: "INC-1001",
@@ -39,11 +40,13 @@ export const seedIncidents: Incident[] = [
 /** Fetch seed incidents from the local API and fall back to bundled demo data. */
 export async function fetchIncidents(): Promise<Incident[]> {
   try {
+    // Prefer the backend contract when it is reachable during local development.
     const response = await fetch("/api/incidents");
     if (!response.ok) {
       return seedIncidents;
     }
 
+    // Accept only a non-empty incidents array; malformed payloads fall back to demo data.
     const payload = (await response.json()) as { incidents: Incident[] };
     if (!Array.isArray(payload.incidents) || payload.incidents.length === 0) {
       return seedIncidents;
@@ -51,6 +54,7 @@ export async function fetchIncidents(): Promise<Incident[]> {
 
     return payload.incidents;
   } catch {
+    // Keep the M1 demo usable even when FastAPI is not running.
     return seedIncidents;
   }
 }

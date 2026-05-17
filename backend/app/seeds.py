@@ -14,16 +14,19 @@ def load_seed_incidents() -> list[dict[str, Any]]:
     with INCIDENTS_PATH.open(encoding="utf-8") as seed_file:
         payload = json.load(seed_file)
 
+    # The seed file stores records under "incidents" so future seed groups can share the folder.
     return list(payload["incidents"])
 
 
 def get_seed_incident(incident_id: str) -> dict[str, Any] | None:
     """Return one curated incident by id, or None when it is unknown."""
 
+    # Scan the small curated seed list directly; a database lookup belongs to a later milestone.
     for incident in load_seed_incidents():
         if incident["id"] == incident_id:
             return incident
 
+    # Return None so the API layer can translate the miss into an HTTP 404.
     return None
 
 

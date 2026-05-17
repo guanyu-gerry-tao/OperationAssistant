@@ -48,6 +48,7 @@ def clear_settings_cache() -> None:
 
 
 def test_health_reports_ok_for_real_postgres_and_redis() -> None:
+    # Skip unless the caller explicitly points the test at real local dependencies.
     database_url = os.getenv("OA_DATABASE_URL")
     redis_url = os.getenv("OA_REDIS_URL")
     if database_url is None or redis_url is None:
@@ -63,14 +64,17 @@ def test_health_reports_ok_for_real_postgres_and_redis() -> None:
 
 
 def test_foundation_migration_matches_seed_table_shapes() -> None:
+    # Skip unless the caller explicitly points the test at a disposable Postgres database.
     database_url = os.getenv("OA_DATABASE_URL")
     if database_url is None:
         pytest.skip("Migration smoke test requires OA_DATABASE_URL.")
 
+    # Apply the M1 migration exactly as operators would apply it in a fresh database.
     migration_sql = Path("backend/migrations/001_foundation.sql").read_text(encoding="utf-8")
 
     with psycopg.connect(database_url) as connection:
         connection.execute(migration_sql)
+        # Read schema metadata so the test can compare actual database column contracts.
         rows = connection.execute(
             """
             SELECT table_name, column_name, data_type, is_nullable
@@ -97,6 +101,7 @@ def test_foundation_migration_matches_seed_table_shapes() -> None:
             """
         ).fetchall()
 
+    # Re-group rows by table to make each expected column assertion easy to read.
     columns_by_table = {
         table_name: {
             column_name: (data_type, is_nullable)
@@ -109,4 +114,5 @@ def test_foundation_migration_matches_seed_table_shapes() -> None:
         for column_name, expected_contract in expected_columns.items():
             assert columns_by_table[table_name][column_name] == expected_contract
 
+    # The tool sample table must stay linked to incidents so seed evidence is traceable.
     assert ("tool_sample_records", "incident_id", "incidents", "id") in foreign_key_rows
