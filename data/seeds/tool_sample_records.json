@@ -1,0 +1,37 @@
+{
+  "records": [
+    {
+      "id": "TOOL-1001",
+      "incident_id": "INC-1001",
+      "tool_name": "get_failed_events",
+      "record_type": "sample_failed_event",
+      "payload": {
+        "workflow_id": "wf-checkout-7741",
+        "last_error": "Payment authorization timeout",
+        "retry_count": 5
+      }
+    },
+    {
+      "id": "TOOL-1002",
+      "incident_id": "INC-1002",
+      "tool_name": "get_service_metrics",
+      "record_type": "sample_metric",
+      "payload": {
+        "metric": "validation_error_rate",
+        "value": 0.18,
+        "window": "15m"
+      }
+    },
+    {
+      "id": "TOOL-1003",
+      "incident_id": "INC-1003",
+      "tool_name": "get_trace_like_records",
+      "record_type": "sample_trace",
+      "payload": {
+        "queue_depth": 2400,
+        "p95_latency_ms": 8200,
+        "worker_pool": "notification-email"
+      }
+    }
+  ]
+}

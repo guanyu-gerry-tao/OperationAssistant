@@ -15,9 +15,21 @@
 
 - Commit by logical step, not by arbitrary time slices.
 - Create PRs by milestone.
+- Prefer one Codex goal per milestone when using goal-based execution.
+- Milestones should have a clear done state and should avoid unnecessary decision branches.
+- If a milestone requires a decision, document the recommended default and ask the user only when the choice materially changes scope, cost, or architecture.
 - Agents may create commits and open PRs when a milestone or coherent logical step is complete.
 - Agents must not merge PRs by themselves.
 - When refactoring or deleting meaningful code, make a dedicated commit when the change is substantial enough to review independently.
+
+## Benchmarkable Baselines
+
+- For mechanisms that prove an engineering design choice, keep a runnable baseline mode and an improved mode in the current codebase.
+- Do not rely on old commits as the only way to compare behavior or performance.
+- Baseline and improved modes should be switchable through configuration, strategy selection, command flags, benchmark parameters, or eval arms.
+- Benchmark and eval scripts should remain runnable after later milestones.
+- Do not add A/B modes for every feature; use them only when the comparison creates a useful metric, debugging story, or design explanation.
+- Do not remove a baseline mode unless it is moved to `Archive/` and the reason is documented.
 
 ## File Deletion Policy
 

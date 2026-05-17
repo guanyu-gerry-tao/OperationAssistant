@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: operation-assistant-postgres
+    environment:
+      POSTGRES_DB: operation_assistant
+      POSTGRES_USER: operation_assistant
+      POSTGRES_PASSWORD: operation_assistant
+    ports:
+      - "15432:5432"
+    volumes:
+      - operation-assistant-postgres-data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U operation_assistant -d operation_assistant"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: operation-assistant-redis
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  operation-assistant-postgres-data:
