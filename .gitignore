@@ -1,0 +1,54 @@
+# Local machine
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local agent instructions and private planning
+AGENTS.override.md
+docs/internal/
+Archive/
+
+# Environment, secrets, and provider keys
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+
+# Python AI backend
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node / assistant frontend
+node_modules/
+dist/
+.next/
+coverage/
+playwright-report/
+test-results/
+
+# AI runtime artifacts
+runs/
+traces/
+evals/results/
+evals/tmp/
+retrieval-cache/
+vector-store/
+*.sqlite
+*.sqlite3
+
+# Local runtime logs and scratch data
+logs/
+tmp/
+*.log
+*.jsonl
+*.ndjson
