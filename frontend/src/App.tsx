@@ -53,6 +53,15 @@ export default function App() {
     return incidents[0];
   }, [incidents, selectedIncidentId]);
 
+  if (selectedIncident === undefined) {
+    return (
+      <main className="app-shell empty-state">
+        <h1>Incident investigation workspace</h1>
+        <p>No seed incidents are available.</p>
+      </main>
+    );
+  }
+
   const investigation = buildPlaceholderInvestigation(selectedIncident);
 
   return (

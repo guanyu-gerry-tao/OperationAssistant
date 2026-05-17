@@ -6,9 +6,15 @@ CREATE TABLE IF NOT EXISTS incidents (
     severity TEXT NOT NULL,
     service TEXT NOT NULL,
     symptom TEXT NOT NULL,
+    customer_impact TEXT NOT NULL,
+    likely_area TEXT NOT NULL,
     status TEXT NOT NULL,
     started_at TIMESTAMPTZ NOT NULL
 );
+
+ALTER TABLE incidents
+    ADD COLUMN IF NOT EXISTS customer_impact TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS likely_area TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS runbook_metadata (
     id TEXT PRIMARY KEY,

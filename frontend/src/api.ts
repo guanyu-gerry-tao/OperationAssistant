@@ -45,6 +45,10 @@ export async function fetchIncidents(): Promise<Incident[]> {
     }
 
     const payload = (await response.json()) as { incidents: Incident[] };
+    if (!Array.isArray(payload.incidents) || payload.incidents.length === 0) {
+      return seedIncidents;
+    }
+
     return payload.incidents;
   } catch {
     return seedIncidents;

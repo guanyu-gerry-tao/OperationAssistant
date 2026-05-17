@@ -20,6 +20,45 @@ jobs:
       - name: Run backend tests
         run: python -m pytest tests/backend -q
 
+  backend-dependencies:
+    name: Backend dependency smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: operation_assistant
+          POSTGRES_USER: operation_assistant
+          POSTGRES_PASSWORD: operation_assistant
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U operation_assistant -d operation_assistant"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Run dependency smoke tests
+        env:
+          OA_DATABASE_URL: postgresql://operation_assistant:operation_assistant@127.0.0.1:5432/operation_assistant
+          OA_REDIS_URL: redis://127.0.0.1:6379/0
+        run: python -m pytest tests/backend/test_dependency_smoke.py -q
+
   frontend:
     name: Frontend checks
     runs-on: ubuntu-latest
