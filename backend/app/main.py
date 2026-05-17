@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.retrieval import router as retrieval_router
 from backend.app.config import get_settings
 from backend.app.db import check_database_status, check_redis_status
 from backend.app.seeds import (
@@ -12,14 +13,21 @@ from backend.app.seeds import (
 
 app = FastAPI(title="OperationAssistant API", version="0.1.0")
 
-# Allow the local Vite dev server to call the API during M1 demos.
+# Allow the local Vite dev server to call the API during local demos.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+    allow_origins=[
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:5174",
+        "http://localhost:5174",
+    ],
     allow_credentials=False,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+app.include_router(retrieval_router)
 
 
 @app.get("/health")

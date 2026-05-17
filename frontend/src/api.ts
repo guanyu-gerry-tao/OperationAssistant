@@ -1,4 +1,4 @@
-import type { Incident } from "./types";
+import type { Incident, RetrievalPreview } from "./types";
 
 // Keep a bundled copy of the seed incidents so the UI works before the API is running.
 export const seedIncidents: Incident[] = [
@@ -57,4 +57,23 @@ export async function fetchIncidents(): Promise<Incident[]> {
     // Keep the M1 demo usable even when FastAPI is not running.
     return seedIncidents;
   }
+}
+
+/** Fetch ranked runbook chunks and citations for the retrieval preview panel. */
+export async function fetchRetrievalPreview(
+  query: string,
+  strategy: RetrievalPreview["strategy"] = "hybrid_rerank_rewrite",
+  topK = 3,
+): Promise<RetrievalPreview> {
+  const params = new URLSearchParams({
+    query,
+    strategy,
+    top_k: String(topK),
+  });
+  const response = await fetch(`/api/retrieval?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Retrieval preview failed");
+  }
+
+  return (await response.json()) as RetrievalPreview;
 }

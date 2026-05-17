@@ -70,4 +70,49 @@ describe("App", () => {
     })).toBeInTheDocument();
     expect(within(detailPanel).getByText("partner feed validation")).toBeInTheDocument();
   });
+
+  it("shows retrieval citations returned by the API", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url.startsWith("/api/incidents")) {
+        return Promise.resolve({
+          ok: false,
+          json: async () => ({ incidents: [] }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          query: "checkout retry timeout",
+          rewritten_query: "checkout retry timeout runbook incident",
+          strategy: "hybrid_rerank_rewrite",
+          chunks: [
+            {
+              chunk_id: "RB-1001-001",
+              source_id: "RB-1001",
+              title: "Workflow retry exhaustion checklist",
+              snippet: "Check retry exhaustion before replay planning.",
+              score: 0.92,
+              metadata: { service: "checkout-workflow", incident_pattern: "failed workflow retry plan" },
+              citation: {
+                source_id: "RB-1001",
+                source_title: "Workflow retry exhaustion checklist",
+                source_path: "data/runbooks/workflow_retry_exhaustion.md",
+                chunk_id: "RB-1001-001",
+              },
+            },
+          ],
+        }),
+      });
+    }));
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Run retrieval preview" }));
+
+    expect(await screen.findByText("Workflow retry exhaustion checklist")).toBeInTheDocument();
+    expect(screen.getByText("Source: data/runbooks/workflow_retry_exhaustion.md")).toBeInTheDocument();
+    expect(screen.getByText("hybrid_rerank_rewrite")).toBeInTheDocument();
+  });
 });
