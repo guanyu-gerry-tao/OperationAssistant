@@ -24,7 +24,9 @@
 
 - Do not do implementation work directly on `main`.
 - Work on a feature, milestone, or fix branch. Reusing the current milestone branch is fine; creating a new branch for every tiny step is not required.
-- Commit by logical step, not by arbitrary time slices.
+- Commit by logical step on the feature or milestone branch, not by arbitrary time slices.
+- Do not manually squash local branch commits before opening a PR unless the user explicitly asks.
+- Preserve useful logical commits on the branch for review; `main` stays clean through GitHub squash merge.
 - Create PRs by milestone.
 - Prefer one Codex goal per milestone when using goal-based execution.
 - Milestones should have a clear done state and should avoid unnecessary decision branches.
