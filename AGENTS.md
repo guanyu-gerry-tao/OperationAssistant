@@ -3,6 +3,7 @@
 ## Code Style
 
 - Keep code straightforward and beginner-readable.
+- Write all source code, code comments, doc comments, test names, commit messages, and public documentation in English.
 - Do not use fancy syntax sugar when a clear ordinary form is easier to read.
 - Do not compress conditional logic into one-line `if` / `else` expressions.
 - Write `if` / `else` branches on separate lines with explicit blocks.
@@ -10,6 +11,14 @@
 - Add Javadoc or the language-equivalent doc comment for every public method, function, class, and important internal helper.
 - Prefer descriptive names over abbreviations.
 - Avoid clever abstractions unless they remove real duplication or make the system easier to reason about.
+
+## Testing Expectations
+
+- Every milestone or PR that changes behavior must include tests.
+- Do not validate a feature with only one happy-path case; include at least two meaningful test cases for each core behavior when the behavior is large enough to justify it.
+- Use edge conditions, invalid inputs, failure paths, empty states, boundary values, dependency errors, or conflict scenarios as guidance for meaningful coverage when they are relevant to the behavior.
+- Tests should prove the behavior introduced by the milestone, not only that the application starts.
+- Test names and assertions should make the scenario and expected behavior clear to a reviewer.
 
 ## Change Management
 

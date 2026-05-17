@@ -1,12 +1,26 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from backend.app.config import get_settings
 from backend.app.main import app
 
 
 client = TestClient(app)
 
 
-def test_health_returns_service_and_dependency_status() -> None:
+@pytest.fixture(autouse=True)
+def clear_settings_cache() -> None:
+    """Clear cached settings so each test controls its own environment."""
+
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def test_health_returns_not_configured_when_dependencies_are_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OA_DATABASE_URL", raising=False)
+    monkeypatch.delenv("OA_REDIS_URL", raising=False)
+
     response = client.get("/health")
 
     assert response.status_code == 200
@@ -20,18 +34,36 @@ def test_health_returns_service_and_dependency_status() -> None:
     }
 
 
-def test_seed_incidents_endpoint_returns_curated_incidents() -> None:
+def test_health_returns_unavailable_when_dependencies_cannot_be_reached(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "OA_DATABASE_URL",
+        "postgresql://operation_assistant:operation_assistant@127.0.0.1:1/operation_assistant",
+    )
+    monkeypatch.setenv("OA_REDIS_URL", "redis://127.0.0.1:1/0")
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["dependencies"] == {
+        "database": "unavailable",
+        "redis": "unavailable",
+    }
+
+
+def test_seed_incidents_endpoint_returns_all_curated_incidents() -> None:
     response = client.get("/api/incidents")
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body["incidents"]) >= 3
-    assert body["incidents"][0]["id"] == "INC-1001"
-    assert body["incidents"][0]["severity"] == "high"
-    assert "symptom" in body["incidents"][0]
+    incidents = body["incidents"]
+    incident_ids = [incident["id"] for incident in incidents]
+    assert incident_ids == ["INC-1001", "INC-1002", "INC-1003"]
+    assert all("symptom" in incident for incident in incidents)
 
 
-def test_incident_detail_includes_placeholder_investigation() -> None:
+def test_incident_detail_includes_placeholder_investigation_for_known_incident() -> None:
     response = client.get("/api/incidents/INC-1001")
 
     assert response.status_code == 200
@@ -39,3 +71,10 @@ def test_incident_detail_includes_placeholder_investigation() -> None:
     assert body["incident"]["id"] == "INC-1001"
     assert body["investigation"]["status"] == "placeholder"
     assert body["investigation"]["next_capability"] == "M2 retrieval and citations"
+
+
+def test_incident_detail_returns_not_found_for_unknown_incident() -> None:
+    response = client.get("/api/incidents/INC-9999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Incident not found"}
