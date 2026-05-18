@@ -65,15 +65,18 @@ export async function fetchRetrievalPreview(
   strategy: RetrievalPreview["strategy"] = "hybrid_rerank_rewrite",
   topK = 3,
 ): Promise<RetrievalPreview> {
+  // Encode query knobs through URLSearchParams so spaces and punctuation stay safe.
   const params = new URLSearchParams({
     query,
     strategy,
     top_k: String(topK),
   });
+  // The backend owns retrieval behavior; the frontend only renders the returned preview.
   const response = await fetch(`/api/retrieval?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Retrieval preview failed");
   }
 
+  // The API contract is covered by frontend and backend retrieval tests.
   return (await response.json()) as RetrievalPreview;
 }

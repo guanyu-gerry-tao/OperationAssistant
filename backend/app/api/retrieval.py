@@ -20,6 +20,7 @@ def preview_retrieval(
 ) -> dict[str, object]:
     """Return ranked runbook chunks with citations for the investigation preview."""
 
+    # Build optional metadata filters from query parameters before calling retrieval.
     metadata_filter = {}
     if service:
         metadata_filter["service"] = service
@@ -27,6 +28,7 @@ def preview_retrieval(
         metadata_filter["incident_pattern"] = incident_pattern
 
     try:
+        # Load the local runbook corpus on demand so the endpoint stays stateless in M2.
         result = retrieve_chunks(
             RetrievalRequest(
                 query=query,
@@ -37,6 +39,8 @@ def preview_retrieval(
             documents=load_runbook_documents(),
         )
     except ValueError as exc:
+        # Convert retrieval validation failures into the public API error contract.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # Dataclasses keep backend code typed; FastAPI returns plain dictionaries as JSON.
     return asdict(result)

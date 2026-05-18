@@ -72,13 +72,16 @@ export default function App() {
   // M1 computes the placeholder locally because retrieval has not been implemented yet.
   const investigation = buildPlaceholderInvestigation(selectedIncident);
 
+  /** Load ranked runbook chunks for the current preview query. */
   async function runRetrievalPreview() {
+    // Show loading state while the FastAPI retrieval endpoint ranks chunks.
     setRetrievalStatus("loading");
     try {
       const preview = await fetchRetrievalPreview(retrievalQuery);
       setRetrievalPreview(preview);
       setRetrievalStatus("idle");
     } catch {
+      // Preserve the last successful preview and only mark the new request as failed.
       setRetrievalStatus("error");
     }
   }

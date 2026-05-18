@@ -21,11 +21,14 @@ REWRITE_HINTS = {
 def rewrite_query(query: str) -> str:
     """Expand visible incident terms for the improved retrieval strategy."""
 
+    # Match visible user terms against a small local synonym map for the M2 corpus.
     tokens = set(TOKEN_PATTERN.findall(query.lower()))
     hints = [hint for token, hint in REWRITE_HINTS.items() if token in tokens]
     if not hints:
+        # Add generic grounding terms so citation/evidence runbooks stay discoverable.
         return f"{query} runbook incident response evidence"
 
+    # Preserve the original query and append each hint term only once.
     unique_terms = []
     seen = set(tokens)
     for hint in hints:

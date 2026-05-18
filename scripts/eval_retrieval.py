@@ -8,6 +8,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
+    # Allow this script to run directly from the repository root without installing a package.
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.app.retrieval.loader import load_runbook_documents
@@ -28,19 +29,25 @@ def run_retrieval_eval(
 ) -> dict[str, Any]:
     """Run labeled retrieval cases and return benchmark metrics."""
 
+    # Fail fast when a caller asks for a strategy the application cannot run.
     if strategy not in SUPPORTED_STRATEGIES:
         raise ValueError("Unknown retrieval strategy")
 
     cases = json.loads(cases_path.read_text(encoding="utf-8"))
-    selected_cases = cases[:limit] if limit is not None else cases
+    if limit is not None:
+        selected_cases = cases[:limit]
+    else:
+        selected_cases = cases
     documents = load_runbook_documents()
 
+    # Accumulate per-case details plus aggregate counters for the summary metrics.
     results = []
     precision_hits = 0
     citation_hits = 0
     latencies = []
 
     for case in selected_cases:
+        # Run each labeled query through the same retrieval path used by the API.
         request = RetrievalRequest(
             query=case["query"],
             strategy=strategy,
@@ -56,6 +63,7 @@ def run_retrieval_eval(
             for chunk in result.chunks
         )
 
+        # Precision counts whether any expected source appears in the returned top-k chunks.
         precision_hits += 1 if has_expected_source else 0
         citation_hits += 1 if has_expected_citation else 0
         latencies.append(result.latency_ms)
@@ -73,6 +81,7 @@ def run_retrieval_eval(
         )
 
     case_count = len(selected_cases)
+    # Keep zero-case behavior defined so smoke runs with empty subsets do not crash.
     return {
         "strategy": strategy,
         "case_count": case_count,
@@ -86,6 +95,7 @@ def run_retrieval_eval(
 def write_eval_report(report: dict[str, Any], output_dir: Path = DEFAULT_OUTPUT_DIR) -> tuple[Path, Path]:
     """Persist retrieval benchmark output as JSON and Markdown."""
 
+    # Eval output is ignored by git, but keeping it on disk makes manual review easier.
     output_dir.mkdir(parents=True, exist_ok=True)
     strategy = report["strategy"]
     json_path = output_dir / f"retrieval_{strategy}.json"
@@ -97,6 +107,9 @@ def write_eval_report(report: dict[str, Any], output_dir: Path = DEFAULT_OUTPUT_
 
 
 def _format_markdown_report(report: dict[str, Any]) -> str:
+    """Render a compact Markdown summary for humans reviewing retrieval quality."""
+
+    # Start with aggregate metrics before listing case-level hit details.
     lines = [
         f"# Retrieval Eval: {report['strategy']}",
         "",
@@ -109,6 +122,7 @@ def _format_markdown_report(report: dict[str, Any]) -> str:
         "| --- | --- | --- | --- |",
     ]
     for case in report["cases"]:
+        # Keep rows short by showing source ids instead of full chunk text.
         sources = ", ".join(case["returned_sources"])
         lines.append(f"| {case['id']} | {case['hit']} | {case['citation_hit']} | {sources} |")
     lines.append("")
@@ -116,6 +130,9 @@ def _format_markdown_report(report: dict[str, Any]) -> str:
 
 
 def main() -> None:
+    """Parse CLI arguments, run the eval, and print summary metrics."""
+
+    # The CLI keeps baseline and improved retrieval strategies runnable side by side.
     parser = argparse.ArgumentParser(description="Run retrieval benchmark cases.")
     parser.add_argument("--strategy", choices=sorted(SUPPORTED_STRATEGIES), required=True)
     parser.add_argument("--limit", type=int, default=None)
@@ -123,6 +140,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     args = parser.parse_args()
 
+    # Write both machine-readable JSON and reviewer-friendly Markdown outputs.
     report = run_retrieval_eval(strategy=args.strategy, limit=args.limit, top_k=args.top_k)
     json_path, markdown_path = write_eval_report(report, args.output_dir)
     print(f"Wrote {json_path}")
