@@ -35,6 +35,22 @@ EXPECTED_TABLE_COLUMNS = {
         "record_type": ("text", "NO"),
         "payload": ("jsonb", "NO"),
     },
+    "documents": {
+        "id": ("text", "NO"),
+        "source_id": ("text", "NO"),
+        "title": ("text", "NO"),
+        "source_path": ("text", "NO"),
+        "metadata": ("jsonb", "NO"),
+    },
+    "document_chunks": {
+        "id": ("text", "NO"),
+        "document_id": ("text", "NO"),
+        "source_id": ("text", "NO"),
+        "chunk_index": ("integer", "NO"),
+        "content": ("text", "NO"),
+        "metadata": ("jsonb", "NO"),
+        "embedding": ("USER-DEFINED", "YES"),
+    },
 }
 
 
@@ -63,14 +79,19 @@ def test_health_reports_ok_for_real_postgres_and_redis() -> None:
     }
 
 
-def test_foundation_migration_matches_seed_table_shapes() -> None:
+def test_migrations_match_foundation_and_retrieval_table_shapes() -> None:
     # Skip unless the caller explicitly points the test at a disposable Postgres database.
     database_url = os.getenv("OA_DATABASE_URL")
     if database_url is None:
         pytest.skip("Migration smoke test requires OA_DATABASE_URL.")
 
-    # Apply the M1 migration exactly as operators would apply it in a fresh database.
-    migration_sql = Path("backend/migrations/001_foundation.sql").read_text(encoding="utf-8")
+    # Apply foundation first, then retrieval tables, just like a fresh database rollout.
+    migration_sql = "\n".join(
+        [
+            Path("backend/migrations/001_foundation.sql").read_text(encoding="utf-8"),
+            Path("backend/migrations/002_retrieval.sql").read_text(encoding="utf-8"),
+        ]
+    )
 
     with psycopg.connect(database_url) as connection:
         connection.execute(migration_sql)
@@ -97,8 +118,9 @@ def test_foundation_migration_matches_seed_table_shapes() -> None:
             JOIN information_schema.constraint_column_usage AS ccu
                 ON ccu.constraint_name = tc.constraint_name
             WHERE tc.constraint_type = 'FOREIGN KEY'
-                AND tc.table_name = 'tool_sample_records'
-            """
+                AND tc.table_name = ANY(%s)
+            """,
+            (["tool_sample_records", "document_chunks"],),
         ).fetchall()
 
     # Re-group rows by table to make each expected column assertion easy to read.
@@ -116,3 +138,4 @@ def test_foundation_migration_matches_seed_table_shapes() -> None:
 
     # The tool sample table must stay linked to incidents so seed evidence is traceable.
     assert ("tool_sample_records", "incident_id", "incidents", "id") in foreign_key_rows
+    assert ("document_chunks", "document_id", "documents", "id") in foreign_key_rows

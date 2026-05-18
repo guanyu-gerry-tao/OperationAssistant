@@ -8,7 +8,8 @@ OperationAssistant has a runnable local foundation. This guide records the publi
 - The frontend is a React/TypeScript/Vite app under `frontend/`.
 - Local PostgreSQL/pgvector and Redis run through Docker Compose.
 - Curated seed data is loaded from JSON files under `data/seeds/`.
-- Public docs should only describe implemented behavior as implemented. Retrieval, tool calling, approval, and eval features are still planned.
+- Runbook retrieval data is loaded from Markdown files under `data/runbooks/`.
+- Public docs should only describe implemented behavior as implemented. Tool calling, approval, answer verification, and eval dashboards are still planned.
 
 ## Setup
 
@@ -74,6 +75,23 @@ npm --prefix frontend run build
 ```
 
 `make test` runs the same current checks.
+
+Retrieval eval commands:
+
+```bash
+.venv/bin/python scripts/eval_retrieval.py --strategy lexical --limit 30
+.venv/bin/python scripts/eval_retrieval.py --strategy hybrid_rerank_rewrite --limit 30
+```
+
+The eval runner writes local JSON and Markdown artifacts under `evals/results/retrieval/`. Those output artifacts are intentionally ignored because they are generated from the tracked eval cases.
+
+## Retrieval Development Notes
+
+- The default user-facing strategy is `hybrid_rerank_rewrite`.
+- The `lexical` strategy must remain runnable as a baseline for tests and evals.
+- The current embedding provider is deterministic and local so tests, demos, and evals do not require an external API key.
+- Retrieval should return source citations with `source_id`, `source_title`, `source_path`, and `chunk_id`.
+- Retrieval is not allowed to execute diagnostic tools, apply remediation, or approve risky actions.
 
 ## PR And Milestone Workflow
 

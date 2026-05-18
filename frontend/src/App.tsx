@@ -1,8 +1,8 @@
-import { Activity, Database, Server, ShieldCheck } from "lucide-react";
+import { Activity, Database, FileSearch, Server, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { fetchIncidents, seedIncidents } from "./api";
-import type { Incident, Investigation } from "./types";
+import { fetchIncidents, fetchRetrievalPreview, seedIncidents } from "./api";
+import type { Incident, Investigation, RetrievalPreview } from "./types";
 import "./styles.css";
 
 
@@ -34,6 +34,9 @@ function formatStartedAt(value: string): string {
 export default function App() {
   const [incidents, setIncidents] = useState<Incident[]>(seedIncidents);
   const [selectedIncidentId, setSelectedIncidentId] = useState(seedIncidents[0].id);
+  const [retrievalQuery, setRetrievalQuery] = useState("why did checkout payment retries exhaust");
+  const [retrievalPreview, setRetrievalPreview] = useState<RetrievalPreview | null>(null);
+  const [retrievalStatus, setRetrievalStatus] = useState<"idle" | "loading" | "error">("idle");
 
   useEffect(() => {
     // Replace bundled demo data with API data when the backend is available.
@@ -68,6 +71,20 @@ export default function App() {
 
   // M1 computes the placeholder locally because retrieval has not been implemented yet.
   const investigation = buildPlaceholderInvestigation(selectedIncident);
+
+  /** Load ranked runbook chunks for the current preview query. */
+  async function runRetrievalPreview() {
+    // Show loading state while the FastAPI retrieval endpoint ranks chunks.
+    setRetrievalStatus("loading");
+    try {
+      const preview = await fetchRetrievalPreview(retrievalQuery);
+      setRetrievalPreview(preview);
+      setRetrievalStatus("idle");
+    } catch {
+      // Preserve the last successful preview and only mark the new request as failed.
+      setRetrievalStatus("error");
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -139,6 +156,46 @@ export default function App() {
               <strong>{investigation.primary_signal}</strong>
             </div>
             <p className="next-capability">{investigation.next_capability}</p>
+          </div>
+
+          <div className="retrieval-panel" aria-label="Retrieval preview">
+            <div className="panel-heading">
+              <h3>Retrieval preview</h3>
+              <span>{retrievalPreview?.strategy ?? "hybrid_rerank_rewrite"}</span>
+            </div>
+            <div className="retrieval-controls">
+              <label htmlFor="retrieval-query">Query</label>
+              <textarea
+                id="retrieval-query"
+                onChange={(event) => setRetrievalQuery(event.target.value)}
+                value={retrievalQuery}
+              />
+              <button className="primary-action" onClick={runRetrievalPreview} type="button">
+                <FileSearch size={16} />
+                Run retrieval preview
+              </button>
+            </div>
+            {retrievalStatus === "error" ? (
+              <p className="error-text">Retrieval preview is unavailable.</p>
+            ) : null}
+            {retrievalPreview !== null ? (
+              <div className="retrieval-results">
+                <div className="query-rewrite">
+                  <span>Rewritten query</span>
+                  <strong>{retrievalPreview.rewritten_query}</strong>
+                </div>
+                {retrievalPreview.chunks.map((chunk) => (
+                  <article className="retrieval-result" key={chunk.chunk_id}>
+                    <div>
+                      <h4>{chunk.title}</h4>
+                      <span>{chunk.source_id} · score {chunk.score.toFixed(2)}</span>
+                    </div>
+                    <p>{chunk.snippet}</p>
+                    <small>Source: {chunk.citation.source_path}</small>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </div>
         </section>
       </section>

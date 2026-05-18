@@ -2,17 +2,21 @@
 
 OperationAssistant is an AI operations assistant foundation for incident investigation. It is designed to grow into a system that combines retrieval, diagnostic tool use, evidence checks, and traceable investigation steps so an operator can understand why a curated service or workflow incident happened and what a safe next action would be.
 
-## Current Foundation
+## Current Capabilities
 
 - FastAPI backend with health and curated incident seed endpoints.
-- React and TypeScript frontend that shows seed incidents and a static investigation placeholder.
+- Retrieval preview endpoint at `/api/retrieval` for runbook chunks and source citations.
+- Two runnable retrieval strategies:
+  - `lexical` for a simple benchmark baseline.
+  - `hybrid_rerank_rewrite` as the default improved path with deterministic embeddings, query rewriting, metadata filtering, and lightweight reranking.
+- React and TypeScript frontend that shows seed incidents, a static investigation placeholder, and a retrieval preview citation panel.
 - Docker Compose services for PostgreSQL with pgvector and Redis.
-- PostgreSQL foundation migration for incidents, runbook metadata, and tool sample records.
-- Backend and frontend smoke tests wired into GitHub Actions.
+- PostgreSQL migrations for foundation tables plus document and chunk tables with pgvector embeddings.
+- Local runbook corpus under `data/runbooks/` and labeled retrieval eval cases under `evals/retrieval/`.
+- Backend and frontend tests wired into GitHub Actions.
 
 ## Planned Later Capabilities
 
-- Retrieve runbooks and system notes with source citations.
 - Query curated incident, workflow, metric, and trace-like sample data through read-only tools.
 - Produce grounded investigation summaries and remediation plans.
 - Track investigation steps, retrieval results, tool calls, verification decisions, and latency/cost metadata.
@@ -28,7 +32,7 @@ OperationAssistant is an AI operations assistant foundation for incident investi
 
 ## Current Status
 
-The first implementation milestone is a runnable local foundation. It does not include live LLM calls, retrieval ranking, diagnostic tool execution, approval gates, or evaluation dashboards yet.
+The current implementation is a runnable local foundation with benchmarkable runbook retrieval and source citations. It does not include live LLM calls, diagnostic tool execution, approval gates, final answer verification, or evaluation dashboards yet.
 
 ## Local Development
 
@@ -66,4 +70,11 @@ Run checks:
 
 ```bash
 make test
+```
+
+Run retrieval evals:
+
+```bash
+.venv/bin/python scripts/eval_retrieval.py --strategy lexical --limit 30
+.venv/bin/python scripts/eval_retrieval.py --strategy hybrid_rerank_rewrite --limit 30
 ```
