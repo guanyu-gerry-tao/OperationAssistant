@@ -76,6 +76,55 @@ def decide_approval_request(
     return approval_request
 
 
+def validate_approval_for_tool(
+    *,
+    approval_id: str | None,
+    incident_id: str,
+    action_type: str,
+    permission_level: str,
+) -> ApprovalRequest:
+    """Return an approved matching request or raise when execution is not allowed."""
+
+    if approval_id is None:
+        raise ValueError("Tool requires approved matching approval")
+
+    approval_request = get_approval_request(approval_id)
+    if approval_request is None:
+        raise ValueError("Tool requires approved matching approval")
+    if approval_request.status != "approved":
+        raise ValueError("Tool requires approved matching approval")
+    if approval_request.incident_id != incident_id:
+        raise ValueError("Tool requires approved matching approval")
+    if approval_request.action_type != action_type:
+        raise ValueError("Tool requires approved matching approval")
+    if approval_request.permission_level != permission_level:
+        raise ValueError("Tool requires approved matching approval")
+    return approval_request
+
+
+def append_approval_audit_event(
+    *,
+    approval_id: str,
+    decision: str,
+    actor: str,
+    note: str,
+) -> ApprovalRequest:
+    """Append a non-decision audit event to an existing approval request."""
+
+    approval_request = get_approval_request(approval_id)
+    if approval_request is None:
+        raise ValueError("Approval request not found")
+    approval_request.audit_log.append(
+        ApprovalAuditEntry(
+            decision=decision,
+            actor=actor,
+            note=note,
+            created_at=_utc_now(),
+        )
+    )
+    return approval_request
+
+
 def approval_to_dict(approval_request: ApprovalRequest) -> dict[str, object]:
     """Convert an approval request into the public API response shape."""
 

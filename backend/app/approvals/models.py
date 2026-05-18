@@ -2,10 +2,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
 
-from backend.app.tools.models import ToolPermissionLevel
-
 
 ApprovalStatus = Literal["pending", "approved", "rejected"]
+ApprovalPermissionLevel = Literal["read_only", "planning", "action_simulated"]
 
 
 @dataclass(frozen=True)
@@ -26,7 +25,7 @@ class ApprovalRequest:
     incident_id: str
     question: str
     action_type: str
-    permission_level: ToolPermissionLevel
+    permission_level: ApprovalPermissionLevel
     risk_reason: str
     status: ApprovalStatus = "pending"
     requested_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

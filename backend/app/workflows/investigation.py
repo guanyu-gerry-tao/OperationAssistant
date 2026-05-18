@@ -29,6 +29,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     started_at = perf_counter()
     trace_id = f"trace-{uuid4().hex[:12]}"
     spans: list[TraceSpan] = []
+    guardrail_span_id: str | None = None
 
     # Run M4 guardrails before the request can enter retrieval, tools, trace, or answer text.
     safety_decision = evaluate_safety(request.question, safety_mode=request.safety_mode)
@@ -44,6 +45,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
                 reasons=", ".join(safety_decision.reasons)
             ),
         )
+        guardrail_span_id = spans[-1].span_id
         return InvestigationResult(
             trace_id=trace_id,
             incident_id=request.incident_id,
@@ -61,7 +63,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
         approval_request = create_approval_request(
             incident_id=request.incident_id,
             question=safe_question,
-            action_type="simulated_replay_plan_release",
+            action_type="simulate_event_replay_plan",
             risk_reason=", ".join(safety_decision.reasons),
         )
         _append_span(
@@ -72,6 +74,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
             input_summary="request safety screening",
             output_summary=f"approval required: {approval_request.approval_id}",
         )
+        guardrail_span_id = spans[-1].span_id
         return InvestigationResult(
             trace_id=trace_id,
             incident_id=request.incident_id,
@@ -98,6 +101,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
                 reasons=", ".join(safety_decision.reasons)
             ),
         )
+        guardrail_span_id = spans[-1].span_id
 
     # Resolve curated incident context before selecting retrieval filters or tools.
     incident = get_seed_incident(request.incident_id)
@@ -106,11 +110,12 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     _append_span(
         spans,
         trace_id=trace_id,
-        parent_span_id=None,
+        parent_span_id=guardrail_span_id,
         step_name="triage",
         input_summary=safe_question,
         output_summary=f"{incident['id']} affects {incident['service']} via {incident['likely_area']}",
     )
+    triage_span_id = spans[-1].span_id
 
     # Retrieve runbook evidence using the M2 improved strategy for the default path.
     retrieval_query = f"{safe_question} {incident['symptom']} {incident['likely_area']}"
@@ -127,12 +132,13 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     _append_span(
         spans,
         trace_id=trace_id,
-        parent_span_id=spans[-1].span_id,
+        parent_span_id=triage_span_id,
         step_name="retrieve",
         input_summary=retrieval_query,
         output_summary=_summarize_citations(retrieved_chunks),
         latency_ms=retrieval_result.latency_ms,
     )
+    retrieve_span_id = spans[-1].span_id
 
     # Baseline mode stops after retrieval so eval can compare tool value in the same codebase.
     selected_tools: list[ToolCall] = []
@@ -142,7 +148,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
         _append_span(
             spans,
             trace_id=trace_id,
-            parent_span_id=spans[0].span_id,
+            parent_span_id=retrieve_span_id,
             step_name="tool_select",
             input_summary=f"{incident['service']} / {safe_question}",
             output_summary=", ".join(call.tool_name for call in selected_tools),
@@ -186,7 +192,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     _append_span(
         spans,
         trace_id=trace_id,
-        parent_span_id=spans[0].span_id,
+        parent_span_id=spans[-1].span_id,
         step_name="answer",
         input_summary=f"{len(retrieved_chunks)} citations, {len(tool_results)} tool outputs",
         output_summary=final_answer[:220],

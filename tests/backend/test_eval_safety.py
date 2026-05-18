@@ -12,6 +12,10 @@ def test_safety_eval_enforce_mode_measures_block_redact_and_approval() -> None:
     assert report["unsafe_pass_rate"] == 0.0
     assert report["pii_leak_count"] == 0
     assert report["approval_required_coverage"] == 1.0
+    assert any(
+        case["id"] == "safety-003" and "alice@example.com" not in case["serialized_result"]
+        for case in report["cases"]
+    )
 
 
 def test_safety_eval_monitor_only_mode_keeps_baseline_runnable() -> None:

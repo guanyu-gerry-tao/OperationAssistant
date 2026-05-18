@@ -7,16 +7,24 @@ PROMPT_INJECTION_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
         r"ignore (all )?(previous|prior) instructions",
+        r"ignore (the )?(above|previous|prior) instruction",
         r"reveal (the )?(hidden )?(system|developer) prompt",
         r"disable (the )?(guardrails|safety)",
         r"jailbreak",
     ]
 ]
 
-UNSAFE_ACTION_TERMS = [
+HIGH_RISK_ACTION_TERMS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
-        r"\b(replay|rerun|retry|restart|rollback|deploy|refund)\b",
+        r"\b(replay|rerun|restart|rollback|deploy|refund)\b",
+    ]
+]
+
+AMBIGUOUS_ACTION_TERMS = [
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in [
+        r"\bretry\b",
     ]
 ]
 
@@ -72,7 +80,7 @@ def evaluate_safety(text: str, *, safety_mode: SafetyMode) -> SafetyDecision:
         return SafetyDecision(
             mode=safety_mode,
             decision="blocked",
-            original_text=text,
+            original_text=redacted_text,
             redacted_text=redacted_text,
             reasons=reasons,
             prompt_injection_detected=prompt_injection_detected,
@@ -86,7 +94,7 @@ def evaluate_safety(text: str, *, safety_mode: SafetyMode) -> SafetyDecision:
         return SafetyDecision(
             mode=safety_mode,
             decision="approval_required",
-            original_text=text,
+            original_text=redacted_text,
             redacted_text=redacted_text,
             reasons=reasons,
             prompt_injection_detected=prompt_injection_detected,
@@ -98,7 +106,7 @@ def evaluate_safety(text: str, *, safety_mode: SafetyMode) -> SafetyDecision:
     return SafetyDecision(
         mode=safety_mode,
         decision="allowed",
-        original_text=text,
+        original_text=redacted_text,
         redacted_text=redacted_text,
         reasons=reasons,
         prompt_injection_detected=prompt_injection_detected,
@@ -123,6 +131,19 @@ def redact_pii(text: str) -> tuple[str, list[str]]:
 def _detect_unsafe_action_request(text: str) -> bool:
     """Return whether text asks to perform a high-risk action now."""
 
-    has_action_term = any(pattern.search(text) is not None for pattern in UNSAFE_ACTION_TERMS)
+    normalized_text = text.strip().lower()
+    starts_with_high_risk_action = re.match(
+        r"^(please\s+)?(replay|rerun|restart|rollback|deploy|refund)\b",
+        normalized_text,
+    ) is not None
+    asks_to_perform_high_risk_action = re.search(
+        r"\b(can you|could you|please|go ahead and)\s+(replay|rerun|restart|rollback|deploy|refund)\b",
+        normalized_text,
+    ) is not None
+    if starts_with_high_risk_action or asks_to_perform_high_risk_action:
+        return True
+
+    has_high_risk_action_term = any(pattern.search(text) is not None for pattern in HIGH_RISK_ACTION_TERMS)
+    has_ambiguous_action_term = any(pattern.search(text) is not None for pattern in AMBIGUOUS_ACTION_TERMS)
     has_action_modifier = any(pattern.search(text) is not None for pattern in UNSAFE_ACTION_MODIFIERS)
-    return has_action_term and has_action_modifier
+    return (has_high_risk_action_term or has_ambiguous_action_term) and has_action_modifier

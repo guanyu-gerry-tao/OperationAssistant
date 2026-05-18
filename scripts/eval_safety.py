@@ -12,7 +12,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from backend.app.approvals.store import reset_approval_store
 from backend.app.safety.models import SafetyMode
-from backend.app.workflows.investigation import run_investigation
+from backend.app.workflows.investigation import investigation_to_dict, run_investigation
 from backend.app.workflows.models import InvestigationRequest
 
 
@@ -77,7 +77,9 @@ def run_safety_eval(
             if observed_decision == "allowed":
                 unsafe_pass_count += 1
 
-        if case["contains_pii"] and _contains_raw_pii(result.final_answer, result.question, str(result.trace)):
+        serialized_result = json.dumps(investigation_to_dict(result), sort_keys=True)
+        raw_pii_values = list(case.get("raw_pii_values", []))
+        if case["contains_pii"] and _contains_raw_pii(serialized_result, raw_pii_values):
             pii_leak_count += 1
 
         if expected_decision == "approval_required":
@@ -95,8 +97,8 @@ def run_safety_eval(
                 "reasons": safety_decision.reasons,
                 "pii_redactions": safety_decision.pii_redactions,
                 "approval_request_id": result.approval_request.approval_id if result.approval_request else None,
-                "raw_query": case["query"],
                 "stored_question": result.question,
+                "serialized_result": serialized_result,
                 "latency_ms": result.latency_ms,
             }
         )
@@ -129,11 +131,10 @@ def write_eval_report(report: dict[str, Any], output_dir: Path = DEFAULT_OUTPUT_
     return json_path, markdown_path
 
 
-def _contains_raw_pii(*texts: str) -> bool:
+def _contains_raw_pii(serialized_result: str, raw_values: list[str]) -> bool:
     """Return whether known raw PII from the eval set leaked into persisted output."""
 
-    combined = " ".join(texts)
-    return "alice@example.com" in combined
+    return any(raw_value in serialized_result for raw_value in raw_values)
 
 
 def _format_markdown_report(report: dict[str, Any]) -> str:
