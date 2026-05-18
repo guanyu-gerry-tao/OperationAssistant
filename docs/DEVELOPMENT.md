@@ -108,8 +108,9 @@ The investigation eval runner writes local JSON and Markdown artifacts under `ev
 - The default user-facing investigation mode is `agent_tools`.
 - The `rag_only` mode must remain runnable as the benchmark baseline for investigation evals.
 - M3 tools are read-only and backed by local sample data, not external systems.
-- Function schemas are exposed through `/api/tools` and executed through the workflow runner.
+- Function schemas are exposed through `/api/tools` as both local tool definitions and JSON Schema compatible `function_schemas`.
 - The product verifier checks runtime answers against retrieved citation ids and tool output values. It is not a replacement for offline eval cases.
+- When a domain evidence tool is called, the product verifier requires the final answer to cite that non-summary tool output, not only the incident summary.
 - Trace spans capture step name, input summary, output summary, latency, token-cost placeholder, and errors in an OpenTelemetry-style shape.
 - The workflow is not allowed to execute write actions, replay workflows, repair state, or approve risky operations.
 

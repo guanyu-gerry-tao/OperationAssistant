@@ -78,7 +78,21 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
         )
         for tool_call in selected_tools:
             tool_started_at = perf_counter()
-            result = execute_tool(tool_call)
+            try:
+                result = execute_tool(tool_call)
+            except ValueError as exc:
+                # Preserve the failed tool step in the trace before returning an API error.
+                _append_span(
+                    spans,
+                    trace_id=trace_id,
+                    parent_span_id=spans[-1].span_id,
+                    step_name=f"tool_execute:{tool_call.tool_name}",
+                    input_summary=str(tool_call.arguments),
+                    output_summary="tool execution failed",
+                    latency_ms=round((perf_counter() - tool_started_at) * 1000, 3),
+                    error=str(exc),
+                )
+                raise
             tool_results.append(result)
             _append_span(
                 spans,
@@ -160,6 +174,10 @@ def _select_tools(*, incident: dict[str, object], question: str) -> list[ToolCal
         )
     ]
 
+    # Summary-only requests should not inflate domain tool selection accuracy.
+    if _is_summary_only_question(question):
+        return calls
+
     # Select one domain tool so the trace explains why tool calling adds evidence.
     if any(term in searchable for term in ["workflow", "retry", "payment", "checkout"]):
         calls.append(
@@ -187,6 +205,26 @@ def _select_tools(*, incident: dict[str, object], question: str) -> list[ToolCal
         )
 
     return calls
+
+
+def _is_summary_only_question(question: str) -> bool:
+    """Return whether the user asks only for incident context, not domain evidence."""
+
+    normalized_question = question.lower()
+    summary_terms = ["summary", "overview", "current incident", "context"]
+    evidence_terms = [
+        "evidence",
+        "record",
+        "metric",
+        "trace",
+        "failed",
+        "why",
+        "diagnose",
+        "investigate",
+    ]
+    has_summary_intent = any(term in normalized_question for term in summary_terms)
+    has_evidence_intent = any(term in normalized_question for term in evidence_terms)
+    return has_summary_intent and not has_evidence_intent
 
 
 def _build_final_answer(

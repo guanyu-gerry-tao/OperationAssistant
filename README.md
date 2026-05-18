@@ -11,7 +11,7 @@ OperationAssistant is an AI operations assistant foundation for incident investi
   - `hybrid_rerank_rewrite` as the default improved path with deterministic embeddings, query rewriting, metadata filtering, and lightweight reranking.
 - React and TypeScript frontend that shows seed incidents, investigation results, and a retrieval preview citation panel.
 - Synchronous investigation endpoint at `/api/investigations` with `rag_only` baseline mode and default `agent_tools` mode.
-- Read-only function-calling tools for incident summaries, service metrics, failed events, and trace-like sample records.
+- Read-only function-calling tools for incident summaries, service metrics, failed events, and trace-like sample records, with JSON Schema compatible function contracts.
 - Product verifier checks that final answers reference retrieved citations and tool outputs.
 - Frontend investigation view with a final answer, tool call timeline, trace viewer, verifier badge, and citation cards.
 - Docker Compose services for PostgreSQL with pgvector and Redis.

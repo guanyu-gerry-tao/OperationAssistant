@@ -6,7 +6,6 @@ import {
   FileSearch,
   GitBranch,
   Server,
-  ShieldCheck,
   Wrench,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

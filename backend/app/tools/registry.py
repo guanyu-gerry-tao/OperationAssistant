@@ -59,6 +59,13 @@ def list_tool_definitions() -> list[ToolDefinition]:
     return [TOOL_DEFINITIONS[name] for name in sorted(TOOL_DEFINITIONS)]
 
 
+def list_function_schemas() -> list[dict[str, Any]]:
+    """Return JSON Schema compatible function-calling contracts."""
+
+    # Expose SDK-shaped schemas while keeping the local ToolDefinition model readable.
+    return [definition.to_function_schema() for definition in list_tool_definitions()]
+
+
 def execute_tool(call: ToolCall) -> ToolResult:
     """Validate and execute one read-only sample tool call."""
 

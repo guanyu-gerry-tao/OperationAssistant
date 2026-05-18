@@ -25,6 +25,37 @@ class ToolDefinition:
     arguments: list[ToolArgumentSpec] = field(default_factory=list)
     output_contract: str = ""
 
+    def to_function_schema(self) -> dict[str, Any]:
+        """Return a JSON Schema compatible function-calling contract."""
+
+        # Standard JSON Schema makes the contract usable beyond this local registry.
+        properties = {
+            argument.name: {
+                "type": argument.argument_type,
+                "description": argument.description,
+            }
+            for argument in self.arguments
+        }
+        required_arguments = [
+            argument.name
+            for argument in self.arguments
+            if argument.required
+        ]
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": required_arguments,
+                "additionalProperties": False,
+            },
+            "metadata": {
+                "permission_level": self.permission_level,
+                "output_contract": self.output_contract,
+            },
+        }
+
 
 @dataclass(frozen=True)
 class ToolCall:

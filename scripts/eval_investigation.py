@@ -44,6 +44,8 @@ def run_investigation_eval(
     grounded_hits = 0
     source_hits = 0
     latencies = []
+    category_buckets: dict[str, dict[str, int]] = {}
+    tool_buckets: dict[str, dict[str, int]] = {}
 
     for case in selected_cases:
         # Use the same deterministic workflow path as the API.
@@ -60,6 +62,7 @@ def run_investigation_eval(
         expected_tools = list(case["expected_tools"])
         expected_sources = set(case["expected_sources"])
         expected_arguments = dict(case["expected_arguments"])
+        category = case.get("category", "domain_evidence")
 
         has_expected_tools = selected_tools == expected_tools
         has_expected_arguments = bool(result.selected_tools) and all(
@@ -74,12 +77,16 @@ def run_investigation_eval(
         tool_argument_hits += 1 if has_expected_arguments else 0
         source_hits += 1 if has_expected_source else 0
         grounded_hits += 1 if grounded else 0
+        _record_bucket_hit(category_buckets, category, has_expected_tools)
+        for expected_tool in expected_tools:
+            _record_bucket_hit(tool_buckets, expected_tool, expected_tool in selected_tools)
         latencies.append(result.latency_ms)
         results.append(
             {
                 "id": case["id"],
                 "incident_id": case["incident_id"],
                 "query": case["query"],
+                "category": category,
                 "expected_tools": expected_tools,
                 "selected_tools": selected_tools,
                 "tool_selection_hit": has_expected_tools,
@@ -105,6 +112,8 @@ def run_investigation_eval(
         "source_coverage": round(source_hits / case_count, 4) if case_count else 0.0,
         "grounded_answer_rate": round(grounded_hits / case_count, 4) if case_count else 0.0,
         "average_latency_ms": round(mean(latencies), 3) if latencies else 0.0,
+        "category_tool_selection_accuracy": _format_bucket_accuracy(category_buckets),
+        "expected_tool_selection_coverage": _format_bucket_accuracy(tool_buckets),
         "cases": results,
     }
 
@@ -130,6 +139,25 @@ def _answer_has_expected_facts(final_answer: str, expected_facts: list[str]) -> 
     return all(fact.lower() in normalized_answer for fact in expected_facts)
 
 
+def _record_bucket_hit(buckets: dict[str, dict[str, int]], name: str, hit: bool) -> None:
+    """Accumulate hit counts for one eval bucket."""
+
+    if name not in buckets:
+        buckets[name] = {"hits": 0, "count": 0}
+    buckets[name]["count"] += 1
+    if hit:
+        buckets[name]["hits"] += 1
+
+
+def _format_bucket_accuracy(buckets: dict[str, dict[str, int]]) -> dict[str, float]:
+    """Convert bucket counts into rounded accuracy values."""
+
+    return {
+        name: round(values["hits"] / values["count"], 4) if values["count"] else 0.0
+        for name, values in sorted(buckets.items())
+    }
+
+
 def _format_markdown_report(report: dict[str, Any]) -> str:
     """Render a compact Markdown summary for humans reviewing M3 quality."""
 
@@ -142,13 +170,15 @@ def _format_markdown_report(report: dict[str, Any]) -> str:
         f"- Source coverage: {report['source_coverage']}",
         f"- Grounded-answer rate: {report['grounded_answer_rate']}",
         f"- Average latency ms: {report['average_latency_ms']}",
+        f"- Category tool-selection accuracy: {json.dumps(report['category_tool_selection_accuracy'], sort_keys=True)}",
+        f"- Expected-tool selection coverage: {json.dumps(report['expected_tool_selection_coverage'], sort_keys=True)}",
         "",
-        "| Case | Tools | Args | Source | Grounded | Verifier |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Case | Category | Tools | Args | Source | Grounded | Verifier |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in report["cases"]:
         lines.append(
-            "| {id} | {tool_selection_hit} | {tool_argument_hit} | {source_hit} | {grounded_answer_hit} | {verifier_status} |".format(
+            "| {id} | {category} | {tool_selection_hit} | {tool_argument_hit} | {source_hit} | {grounded_answer_hit} | {verifier_status} |".format(
                 **case
             )
         )

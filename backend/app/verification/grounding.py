@@ -67,28 +67,45 @@ def _check_answer_references_tool_evidence(
     final_answer: str,
     tool_results: list[ToolResult],
 ) -> VerificationCheck:
-    """Verify that the answer mentions at least one high-signal tool output value."""
+    """Verify that the answer mentions high-signal non-summary tool output values."""
 
-    evidence_terms = []
-    for result in tool_results:
-        evidence_terms.extend(_extract_output_terms(result))
+    # Summary context alone is not enough when a domain evidence tool was called.
+    domain_tool_results = [
+        result
+        for result in tool_results
+        if result.tool_name != "get_incident_summary"
+    ]
+    if not domain_tool_results:
+        return VerificationCheck(
+            name="answer_references_tool_evidence",
+            passed=True,
+            detail="no domain tool output was required for this answer",
+        )
 
-    passed = any(term and term in final_answer for term in evidence_terms)
+    missing_tools = []
+    for result in domain_tool_results:
+        evidence_terms = _extract_output_terms(result)
+        if not any(term and term in final_answer for term in evidence_terms):
+            missing_tools.append(result.tool_name)
+
+    passed = len(missing_tools) == 0
     return VerificationCheck(
         name="answer_references_tool_evidence",
         passed=passed,
-        detail="answer references a tool output value" if passed else "answer does not cite a tool output value",
+        detail=(
+            "answer references every domain tool output"
+            if passed
+            else f"answer does not cite domain tool output from {', '.join(missing_tools)}"
+        ),
     )
 
 
 def _extract_output_terms(result: ToolResult) -> list[str]:
     """Extract deterministic terms that can be checked inside the final answer."""
 
-    if result.tool_name == "get_incident_summary":
-        return [str(result.output.get("service", "")), str(result.output.get("likely_area", ""))]
-
     terms = []
     for record in result.output.get("records", []):
+        terms.append(str(record.get("id", "")))
         for value in record.get("payload", {}).values():
             terms.append(str(value))
     return terms

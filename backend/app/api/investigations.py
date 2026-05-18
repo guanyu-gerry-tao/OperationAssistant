@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from backend.app.tools.registry import list_tool_definitions
+from backend.app.tools.registry import list_function_schemas, list_tool_definitions
 from backend.app.workflows.investigation import investigation_to_dict, run_investigation
 from backend.app.workflows.models import InvestigationRequest
 from backend.app.workflows.store import get_investigation, save_investigation
@@ -26,7 +26,10 @@ class InvestigationCreateRequest(BaseModel):
 def read_tool_schemas() -> dict[str, object]:
     """Return read-only tool schemas used by the function-calling workflow."""
 
-    return {"tools": [asdict(definition) for definition in list_tool_definitions()]}
+    return {
+        "tools": [asdict(definition) for definition in list_tool_definitions()],
+        "function_schemas": list_function_schemas(),
+    }
 
 
 @router.post("/investigations")
