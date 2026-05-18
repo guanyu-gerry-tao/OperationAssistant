@@ -9,7 +9,8 @@ OperationAssistant has a runnable local foundation. This guide records the publi
 - Local PostgreSQL/pgvector and Redis run through Docker Compose.
 - Curated seed data is loaded from JSON files under `data/seeds/`.
 - Runbook retrieval data is loaded from Markdown files under `data/runbooks/`.
-- Public docs should only describe implemented behavior as implemented. Tool calling, approval, answer verification, and eval dashboards are still planned.
+- Read-only investigation tools use curated sample records from `data/seeds/tool_sample_records.json`.
+- Public docs should only describe implemented behavior as implemented. Approval gates, semantic cache, async jobs, live LLM calls, and eval dashboards are still planned.
 
 ## Setup
 
@@ -85,6 +86,15 @@ Retrieval eval commands:
 
 The eval runner writes local JSON and Markdown artifacts under `evals/results/retrieval/`. Those output artifacts are intentionally ignored because they are generated from the tracked eval cases.
 
+Investigation eval commands:
+
+```bash
+.venv/bin/python scripts/eval_investigation.py --mode rag_only
+.venv/bin/python scripts/eval_investigation.py --mode agent_tools
+```
+
+The investigation eval runner writes local JSON and Markdown artifacts under `evals/results/investigation/`. It reports tool-selection accuracy, tool-argument accuracy, source coverage, grounded-answer rate, and latency for the current labeled tool-use cases.
+
 ## Retrieval Development Notes
 
 - The default user-facing strategy is `hybrid_rerank_rewrite`.
@@ -92,6 +102,17 @@ The eval runner writes local JSON and Markdown artifacts under `evals/results/re
 - The current embedding provider is deterministic and local so tests, demos, and evals do not require an external API key.
 - Retrieval should return source citations with `source_id`, `source_title`, `source_path`, and `chunk_id`.
 - Retrieval is not allowed to execute diagnostic tools, apply remediation, or approve risky actions.
+
+## Investigation Workflow Notes
+
+- The default user-facing investigation mode is `agent_tools`.
+- The `rag_only` mode must remain runnable as the benchmark baseline for investigation evals.
+- M3 tools are read-only and backed by local sample data, not external systems.
+- Function schemas are exposed through `/api/tools` as both local tool definitions and JSON Schema compatible `function_schemas`.
+- The product verifier checks runtime answers against retrieved citation ids and tool output values. It is not a replacement for offline eval cases.
+- When a domain evidence tool is called, the product verifier requires the final answer to cite that non-summary tool output, not only the incident summary.
+- Trace spans capture step name, input summary, output summary, latency, token-cost placeholder, and errors in an OpenTelemetry-style shape.
+- The workflow is not allowed to execute write actions, replay workflows, repair state, or approve risky operations.
 
 ## PR And Milestone Workflow
 

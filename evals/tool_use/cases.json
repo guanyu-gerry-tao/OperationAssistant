@@ -1,0 +1,279 @@
+[
+  {
+    "id": "TU-001",
+    "incident_id": "INC-1001",
+    "query": "why did checkout payments get stuck after retries",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["checkout-workflow", "retry budget", "wf-checkout-7741", "5"]
+  },
+  {
+    "id": "TU-002",
+    "incident_id": "INC-1001",
+    "query": "which failed workflow event explains the retry exhaustion",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["Payment authorization timeout", "retry", "RB-1001"]
+  },
+  {
+    "id": "TU-003",
+    "incident_id": "INC-1001",
+    "query": "did the checkout workflow fail because payment retries timed out",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["checkout-workflow", "Payment authorization timeout", "retry"]
+  },
+  {
+    "id": "TU-004",
+    "incident_id": "INC-1001",
+    "query": "what evidence supports not replaying the payment workflow yet",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["RB-1001", "failed event", "wf-checkout-7741"]
+  },
+  {
+    "id": "TU-005",
+    "incident_id": "INC-1001",
+    "query": "summarize the checkout incident and failed event evidence",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["Payment workflow retries exhausted", "checkout-workflow", "5"]
+  },
+  {
+    "id": "TU-006",
+    "incident_id": "INC-1001",
+    "query": "why are orders still pending after checkout retry handling",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["orders remain pending", "retry handling", "RB-1001"]
+  },
+  {
+    "id": "TU-007",
+    "incident_id": "INC-1001",
+    "query": "check retry counters for the payment workflow failure",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["retry", "5", "Payment authorization timeout"]
+  },
+  {
+    "id": "TU-008",
+    "incident_id": "INC-1001",
+    "query": "what should the operator inspect before any manual replay",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["evidence gathering", "wf-checkout-7741", "write action"]
+  },
+  {
+    "id": "TU-009",
+    "incident_id": "INC-1002",
+    "query": "why did inventory validation errors increase",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["inventory-sync", "validation_error_rate", "0.18"]
+  },
+  {
+    "id": "TU-010",
+    "incident_id": "INC-1002",
+    "query": "which service metric supports the partner feed validation issue",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["partner feed validation", "validation_error_rate", "15m"]
+  },
+  {
+    "id": "TU-011",
+    "incident_id": "INC-1002",
+    "query": "investigate inventory sync error rate after a feed schema change",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["Inventory sync error rate increase", "0.18", "RB-1002"]
+  },
+  {
+    "id": "TU-012",
+    "incident_id": "INC-1002",
+    "query": "what evidence says the issue is partner feed validation",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["partner feed", "validation_error_rate", "inventory-sync"]
+  },
+  {
+    "id": "TU-013",
+    "incident_id": "INC-1002",
+    "query": "summarize metric evidence for stale inventory availability",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["Product availability", "validation_error_rate", "0.18"]
+  },
+  {
+    "id": "TU-014",
+    "incident_id": "INC-1002",
+    "query": "how should we reason about inventory feed validation failures",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["schema change", "15m", "RB-1002"]
+  },
+  {
+    "id": "TU-015",
+    "incident_id": "INC-1002",
+    "query": "check error rate evidence for the inventory-sync service",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["inventory-sync", "validation_error_rate", "0.18"]
+  },
+  {
+    "id": "TU-016",
+    "incident_id": "INC-1002",
+    "query": "what did the partner feed incident affect",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["stale", "availability", "validation_error_rate"]
+  },
+  {
+    "id": "TU-017",
+    "incident_id": "INC-1003",
+    "query": "why did notification delivery latency spike",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["notification-worker", "queue depth", "2400"]
+  },
+  {
+    "id": "TU-018",
+    "incident_id": "INC-1003",
+    "query": "which queue evidence explains notification latency",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["p95 latency", "8200", "notification-email"]
+  },
+  {
+    "id": "TU-019",
+    "incident_id": "INC-1003",
+    "query": "investigate the worker queue backlog for notifications",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["worker queue throughput", "queue depth", "2400"]
+  },
+  {
+    "id": "TU-020",
+    "incident_id": "INC-1003",
+    "query": "what trace-like record supports the notification backlog diagnosis",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["RB-1003", "p95 latency", "8200"]
+  },
+  {
+    "id": "TU-021",
+    "incident_id": "INC-1003",
+    "query": "summarize latency evidence for the notification worker",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["Notification delivery latency spike", "notification-worker", "8200"]
+  },
+  {
+    "id": "TU-022",
+    "incident_id": "INC-1003",
+    "query": "check whether queue backlog caused delayed email notifications",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["delayed status notifications", "queue depth", "2400"]
+  },
+  {
+    "id": "TU-023",
+    "incident_id": "INC-1003",
+    "query": "why should we inspect worker throughput before increasing concurrency",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["notification-email", "p95 latency", "read-only"]
+  },
+  {
+    "id": "TU-024",
+    "incident_id": "INC-1003",
+    "query": "what evidence do we have for notification queue throughput trouble",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["worker queue throughput", "queue depth", "8200"],
+    "category": "domain_evidence"
+  },
+  {
+    "id": "TU-025",
+    "incident_id": "INC-1001",
+    "query": "summarize the current incident context",
+    "expected_tools": ["get_incident_summary"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["Payment workflow retries exhausted", "checkout-workflow", "RB-1001"],
+    "category": "summary_only"
+  },
+  {
+    "id": "TU-026",
+    "incident_id": "INC-1002",
+    "query": "give me an overview of the current incident context",
+    "expected_tools": ["get_incident_summary"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["Inventory sync error rate increase", "inventory-sync", "RB-1002"],
+    "category": "summary_only"
+  },
+  {
+    "id": "TU-027",
+    "incident_id": "INC-1003",
+    "query": "what is the current incident summary",
+    "expected_tools": ["get_incident_summary"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["Notification delivery latency spike", "notification-worker", "RB-1003"],
+    "category": "summary_only"
+  },
+  {
+    "id": "TU-028",
+    "incident_id": "INC-1001",
+    "query": "what concrete record explains why orders are stuck",
+    "expected_tools": ["get_incident_summary", "get_failed_events"],
+    "expected_arguments": {"incident_id": "INC-1001"},
+    "expected_sources": ["RB-1001"],
+    "expected_facts": ["wf-checkout-7741", "Payment authorization timeout", "RB-1001"],
+    "category": "weak_keyword_domain"
+  },
+  {
+    "id": "TU-029",
+    "incident_id": "INC-1002",
+    "query": "which measurement supports the stale availability diagnosis",
+    "expected_tools": ["get_incident_summary", "get_service_metrics"],
+    "expected_arguments": {"incident_id": "INC-1002"},
+    "expected_sources": ["RB-1002"],
+    "expected_facts": ["validation_error_rate", "0.18", "RB-1002"],
+    "category": "weak_keyword_domain"
+  },
+  {
+    "id": "TU-030",
+    "incident_id": "INC-1003",
+    "query": "which record supports the delayed notification diagnosis",
+    "expected_tools": ["get_incident_summary", "get_trace_like_records"],
+    "expected_arguments": {"incident_id": "INC-1003"},
+    "expected_sources": ["RB-1003"],
+    "expected_facts": ["queue depth", "2400", "RB-1003"],
+    "category": "weak_keyword_domain"
+  }
+]

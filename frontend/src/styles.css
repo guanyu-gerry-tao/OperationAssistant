@@ -220,12 +220,15 @@ button {
   margin-top: 20px;
 }
 
-.retrieval-controls {
+.retrieval-controls,
+.investigation-controls {
   display: grid;
   gap: 10px;
 }
 
 .retrieval-controls label,
+.investigation-controls label,
+.answer-box span,
 .query-rewrite span {
   color: #61706a;
   font-size: 12px;
@@ -233,7 +236,8 @@ button {
   text-transform: uppercase;
 }
 
-.retrieval-controls textarea {
+.retrieval-controls textarea,
+.investigation-controls textarea {
   border: 1px solid #cbd5cf;
   border-radius: 6px;
   color: #17211f;
@@ -257,6 +261,118 @@ button {
   min-height: 40px;
   padding: 9px 14px;
   width: fit-content;
+}
+
+.segmented-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.segmented-control button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd5cf;
+  border-radius: 6px;
+  color: #24322f;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.segmented-control button.active {
+  background: #e3f0ed;
+  border-color: #2f6f66;
+  color: #28564f;
+  font-weight: 700;
+}
+
+.investigation-results {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.verifier-badge {
+  align-items: center;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+}
+
+.verifier-badge span {
+  color: #5f6b65;
+  font-size: 13px;
+}
+
+.verifier-passed {
+  background: #e6f3ec;
+  border: 1px solid #b8d8c8;
+  color: #22553a;
+}
+
+.verifier-failed {
+  background: #fae1d5;
+  border: 1px solid #edb7a4;
+  color: #8d3219;
+}
+
+.answer-box,
+.timeline-item,
+.trace-row {
+  border: 1px solid #d8dfda;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.answer-box p,
+.timeline-item p,
+.trace-row p,
+.muted-text {
+  color: #40504a;
+  line-height: 1.55;
+  margin: 8px 0 0;
+}
+
+.timeline-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.timeline-grid h4 {
+  margin: 0 0 10px;
+}
+
+.timeline-item,
+.trace-row {
+  background: #fbfcfa;
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.timeline-item span {
+  color: #2f6f66;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.trace-row div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.trace-row div span {
+  color: #5f6b65;
+  font-size: 13px;
 }
 
 .retrieval-results {
@@ -326,7 +442,8 @@ button {
   }
 
   .workspace-grid,
-  .detail-facts {
+  .detail-facts,
+  .timeline-grid {
     grid-template-columns: 1fr;
   }
 

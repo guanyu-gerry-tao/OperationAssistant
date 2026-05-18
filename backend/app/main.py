@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.investigations import router as investigations_router
 from backend.app.api.retrieval import router as retrieval_router
 from backend.app.config import get_settings
 from backend.app.db import check_database_status, check_redis_status
@@ -23,10 +24,11 @@ app.add_middleware(
         "http://localhost:5174",
     ],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
+app.include_router(investigations_router)
 app.include_router(retrieval_router)
 
 
