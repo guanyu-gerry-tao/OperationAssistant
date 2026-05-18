@@ -2,9 +2,11 @@ from dataclasses import asdict
 from time import perf_counter
 from uuid import uuid4
 
+from backend.app.approvals.store import create_approval_request
 from backend.app.retrieval.loader import load_runbook_documents
 from backend.app.retrieval.models import RetrievalRequest, ScoredChunk
 from backend.app.retrieval.retriever import retrieve_chunks
+from backend.app.safety.guardrails import evaluate_safety
 from backend.app.seeds import get_seed_incident
 from backend.app.tools.models import ToolCall, ToolResult
 from backend.app.tools.registry import execute_tool
@@ -27,6 +29,79 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     started_at = perf_counter()
     trace_id = f"trace-{uuid4().hex[:12]}"
     spans: list[TraceSpan] = []
+    guardrail_span_id: str | None = None
+
+    # Run M4 guardrails before the request can enter retrieval, tools, trace, or answer text.
+    safety_decision = evaluate_safety(request.question, safety_mode=request.safety_mode)
+    safe_question = safety_decision.redacted_text
+    if safety_decision.decision == "blocked":
+        _append_span(
+            spans,
+            trace_id=trace_id,
+            parent_span_id=None,
+            step_name="guardrail",
+            input_summary="request safety screening",
+            output_summary="blocked by guardrails: {reasons}".format(
+                reasons=", ".join(safety_decision.reasons)
+            ),
+        )
+        guardrail_span_id = spans[-1].span_id
+        return InvestigationResult(
+            trace_id=trace_id,
+            incident_id=request.incident_id,
+            question=safe_question,
+            mode=request.mode,  # type: ignore[arg-type]
+            final_answer="Request blocked by guardrails before investigation. Reasons: {reasons}.".format(
+                reasons=", ".join(safety_decision.reasons)
+            ),
+            retrieved_chunks=[],
+            safety_decision=safety_decision,
+            trace=spans,
+            latency_ms=round((perf_counter() - started_at) * 1000, 3),
+        )
+    if safety_decision.decision == "approval_required":
+        approval_request = create_approval_request(
+            incident_id=request.incident_id,
+            question=safe_question,
+            action_type="simulate_event_replay_plan",
+            risk_reason=", ".join(safety_decision.reasons),
+        )
+        _append_span(
+            spans,
+            trace_id=trace_id,
+            parent_span_id=None,
+            step_name="guardrail",
+            input_summary="request safety screening",
+            output_summary=f"approval required: {approval_request.approval_id}",
+        )
+        guardrail_span_id = spans[-1].span_id
+        return InvestigationResult(
+            trace_id=trace_id,
+            incident_id=request.incident_id,
+            question=safe_question,
+            mode=request.mode,  # type: ignore[arg-type]
+            final_answer=(
+                "Approval required before releasing a simulated remediation or replay plan. "
+                f"Approval request: {approval_request.approval_id}."
+            ),
+            retrieved_chunks=[],
+            safety_decision=safety_decision,
+            approval_request=approval_request,
+            trace=spans,
+            latency_ms=round((perf_counter() - started_at) * 1000, 3),
+        )
+    if safety_decision.reasons:
+        _append_span(
+            spans,
+            trace_id=trace_id,
+            parent_span_id=None,
+            step_name="guardrail",
+            input_summary="request safety screening",
+            output_summary="allowed with redactions: {reasons}".format(
+                reasons=", ".join(safety_decision.reasons)
+            ),
+        )
+        guardrail_span_id = spans[-1].span_id
 
     # Resolve curated incident context before selecting retrieval filters or tools.
     incident = get_seed_incident(request.incident_id)
@@ -35,14 +110,15 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     _append_span(
         spans,
         trace_id=trace_id,
-        parent_span_id=None,
+        parent_span_id=guardrail_span_id,
         step_name="triage",
-        input_summary=request.question,
+        input_summary=safe_question,
         output_summary=f"{incident['id']} affects {incident['service']} via {incident['likely_area']}",
     )
+    triage_span_id = spans[-1].span_id
 
     # Retrieve runbook evidence using the M2 improved strategy for the default path.
-    retrieval_query = f"{request.question} {incident['symptom']} {incident['likely_area']}"
+    retrieval_query = f"{safe_question} {incident['symptom']} {incident['likely_area']}"
     retrieval_result = retrieve_chunks(
         RetrievalRequest(
             query=retrieval_query,
@@ -56,24 +132,25 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     _append_span(
         spans,
         trace_id=trace_id,
-        parent_span_id=spans[-1].span_id,
+        parent_span_id=triage_span_id,
         step_name="retrieve",
         input_summary=retrieval_query,
         output_summary=_summarize_citations(retrieved_chunks),
         latency_ms=retrieval_result.latency_ms,
     )
+    retrieve_span_id = spans[-1].span_id
 
     # Baseline mode stops after retrieval so eval can compare tool value in the same codebase.
     selected_tools: list[ToolCall] = []
     tool_results: list[ToolResult] = []
     if request.mode == "agent_tools":
-        selected_tools = _select_tools(incident=incident, question=request.question)
+        selected_tools = _select_tools(incident=incident, question=safe_question)
         _append_span(
             spans,
             trace_id=trace_id,
-            parent_span_id=spans[0].span_id,
+            parent_span_id=retrieve_span_id,
             step_name="tool_select",
-            input_summary=f"{incident['service']} / {request.question}",
+            input_summary=f"{incident['service']} / {safe_question}",
             output_summary=", ".join(call.tool_name for call in selected_tools),
         )
         for tool_call in selected_tools:
@@ -107,7 +184,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     # Compose a grounded answer from retrieved sources and optional tool outputs.
     final_answer = _build_final_answer(
         incident=incident,
-        question=request.question,
+        question=safe_question,
         mode=request.mode,  # type: ignore[arg-type]
         retrieved_chunks=retrieved_chunks,
         tool_results=tool_results,
@@ -115,7 +192,7 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     _append_span(
         spans,
         trace_id=trace_id,
-        parent_span_id=spans[0].span_id,
+        parent_span_id=spans[-1].span_id,
         step_name="answer",
         input_summary=f"{len(retrieved_chunks)} citations, {len(tool_results)} tool outputs",
         output_summary=final_answer[:220],
@@ -141,10 +218,11 @@ def run_investigation(request: InvestigationRequest) -> InvestigationResult:
     return InvestigationResult(
         trace_id=trace_id,
         incident_id=request.incident_id,
-        question=request.question,
+        question=safe_question,
         mode=request.mode,  # type: ignore[arg-type]
         final_answer=final_answer,
         retrieved_chunks=retrieved_chunks,
+        safety_decision=safety_decision,
         selected_tools=selected_tools,
         tool_results=tool_results,
         verifier=verifier,

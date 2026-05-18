@@ -19,7 +19,23 @@ def test_tool_registry_exposes_read_only_function_schemas() -> None:
         "get_service_metrics",
         "get_trace_like_records",
     }.issubset(tool_names)
-    assert all(definition.permission_level == "read_only" for definition in definitions)
+    read_only_tool_names = {
+        definition.name
+        for definition in definitions
+        if definition.permission_level == "read_only"
+    }
+    assert {
+        "get_incident_summary",
+        "get_failed_events",
+        "get_service_metrics",
+        "get_trace_like_records",
+    }.issubset(read_only_tool_names)
+    action_tool = next(
+        definition
+        for definition in definitions
+        if definition.name == "simulate_event_replay_plan"
+    )
+    assert action_tool.permission_level == "action_simulated"
     assert all(definition.arguments[0].name == "incident_id" for definition in definitions)
 
 

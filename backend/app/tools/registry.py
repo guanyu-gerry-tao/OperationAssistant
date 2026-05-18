@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from backend.app.approvals.store import append_approval_audit_event, validate_approval_for_tool
 from backend.app.seeds import get_seed_incident
 from backend.app.tools.models import ToolArgumentSpec, ToolCall, ToolDefinition, ToolResult
 
@@ -49,6 +50,16 @@ TOOL_DEFINITIONS = {
         ],
         output_contract="trace-like records with queue depth, latency, or worker state",
     ),
+    "simulate_event_replay_plan": ToolDefinition(
+        name="simulate_event_replay_plan",
+        description="Draft a simulated replay plan for a failed event without external side effects.",
+        permission_level="action_simulated",
+        arguments=[
+            ToolArgumentSpec(name="incident_id", argument_type="string"),
+            ToolArgumentSpec(name="rationale", argument_type="string"),
+        ],
+        output_contract="simulated replay plan steps and approval reminder",
+    ),
 }
 
 
@@ -66,19 +77,44 @@ def list_function_schemas() -> list[dict[str, Any]]:
     return [definition.to_function_schema() for definition in list_tool_definitions()]
 
 
-def execute_tool(call: ToolCall) -> ToolResult:
+def get_tool_definition(tool_name: str) -> ToolDefinition:
+    """Return one tool definition by name."""
+
+    definition = TOOL_DEFINITIONS.get(tool_name)
+    if definition is None:
+        raise ValueError("Unknown tool")
+    return definition
+
+
+def execute_tool(call: ToolCall, *, approval_id: str | None = None) -> ToolResult:
     """Validate and execute one read-only sample tool call."""
 
     # Validate schema before any tool-specific logic runs.
-    definition = TOOL_DEFINITIONS.get(call.tool_name)
-    if definition is None:
-        raise ValueError("Unknown tool")
+    definition = get_tool_definition(call.tool_name)
     _validate_tool_arguments(definition, call.arguments)
 
     # Keep every M3 tool read-only and backed by local sample data.
     incident_id = str(call.arguments["incident_id"])
+
+    # M4 action-like tools are simulated, but they still must bind to a real approval.
+    if definition.permission_level != "read_only":
+        approval_request = validate_approval_for_tool(
+            approval_id=approval_id,
+            incident_id=incident_id,
+            action_type=definition.name,
+            permission_level=definition.permission_level,
+        )
+        append_approval_audit_event(
+            approval_id=approval_request.approval_id,
+            decision="executed_simulation",
+            actor="system",
+            note=f"{definition.name} released after approval",
+        )
+
     if call.tool_name == "get_incident_summary":
         output = _get_incident_summary(incident_id)
+    elif call.tool_name == "simulate_event_replay_plan":
+        output = _build_simulated_replay_plan(incident_id, str(call.arguments["rationale"]))
     else:
         output = _get_tool_records(incident_id=incident_id, tool_name=call.tool_name)
 
@@ -143,11 +179,33 @@ def _get_tool_records(*, incident_id: str, tool_name: str) -> dict[str, Any]:
     }
 
 
+def _build_simulated_replay_plan(incident_id: str, rationale: str) -> dict[str, Any]:
+    """Return a simulated action plan after approval has already been granted."""
+
+    incident = get_seed_incident(incident_id)
+    if incident is None:
+        raise ValueError("Incident not found")
+
+    return {
+        "incident_id": incident_id,
+        "tool_name": "simulate_event_replay_plan",
+        "rationale": rationale,
+        "simulation_only": True,
+        "steps": [
+            "confirm failed event id and retry budget",
+            "dry-run replay against curated sample state",
+            "prepare operator-facing remediation plan",
+        ],
+    }
+
+
 def _summarize_tool_output(tool_name: str, output: dict[str, Any]) -> str:
     """Return a compact human-readable summary for trace spans and UI timelines."""
 
     if tool_name == "get_incident_summary":
         return "{incident_id} on {service}: {symptom}".format(**output)
+    if tool_name == "simulate_event_replay_plan":
+        return "simulated replay plan prepared after human approval"
 
     records = output.get("records", [])
     if not records:

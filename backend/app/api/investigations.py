@@ -2,7 +2,7 @@ from dataclasses import asdict
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from backend.app.tools.registry import list_function_schemas, list_tool_definitions
 from backend.app.workflows.investigation import investigation_to_dict, run_investigation
@@ -14,7 +14,9 @@ router = APIRouter(prefix="/api", tags=["investigations"])
 
 
 class InvestigationCreateRequest(BaseModel):
-    """Request body for a synchronous M3 investigation run."""
+    """Request body for a synchronous investigation run."""
+
+    model_config = ConfigDict(extra="forbid")
 
     incident_id: str = Field(..., min_length=1)
     question: str = Field(..., min_length=1)
@@ -42,6 +44,7 @@ def create_investigation(payload: InvestigationCreateRequest) -> dict[str, objec
                 incident_id=payload.incident_id,
                 question=payload.question,
                 mode=payload.mode,
+                safety_mode="enforce",
                 top_k=payload.top_k,
             )
         )

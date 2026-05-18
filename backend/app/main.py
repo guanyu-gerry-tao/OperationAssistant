@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.approvals import router as approvals_router
 from backend.app.api.investigations import router as investigations_router
 from backend.app.api.retrieval import router as retrieval_router
 from backend.app.config import get_settings
@@ -29,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(investigations_router)
+app.include_router(approvals_router)
 app.include_router(retrieval_router)
 
 

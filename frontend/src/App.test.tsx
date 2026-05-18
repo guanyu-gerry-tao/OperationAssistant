@@ -211,4 +211,107 @@ describe("App", () => {
     expect(screen.getByLabelText("Trace viewer")).toHaveTextContent("tool_execute:get_failed_events");
     expect(screen.getByText("Workflow retry exhaustion checklist")).toBeInTheDocument();
   });
+
+  it("shows guardrail state and lets an operator approve a pending request", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn((url: string, options?: RequestInit) => {
+      if (url.startsWith("/api/incidents")) {
+        return Promise.resolve({
+          ok: false,
+          json: async () => ({ incidents: [] }),
+        });
+      }
+      if (url === "/api/investigations" && options?.method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            trace_id: "trace-approval",
+            incident_id: "INC-1001",
+            question: "replay failed checkout event now",
+            mode: "agent_tools",
+            final_answer: "Approval required before releasing a simulated remediation or replay plan.",
+            retrieved_chunks: [],
+            selected_tools: [],
+            tool_results: [],
+            safety_decision: {
+              mode: "enforce",
+              decision: "approval_required",
+              original_text: "replay failed checkout event now",
+              redacted_text: "replay failed checkout event now",
+              reasons: ["unsafe_replay_or_action"],
+              prompt_injection_detected: false,
+              unsafe_request_detected: true,
+              pii_detected: false,
+              pii_redactions: [],
+            },
+            approval_request: {
+              approval_id: "approval-ui",
+              incident_id: "INC-1001",
+              question: "replay failed checkout event now",
+              action_type: "simulate_event_replay_plan",
+              permission_level: "action_simulated",
+              risk_reason: "unsafe_replay_or_action",
+              status: "pending",
+              requested_at: "2026-05-17T00:00:00Z",
+              decided_at: null,
+              decided_by: null,
+              note: null,
+              audit_log: [],
+            },
+            verifier: null,
+            trace: [
+              {
+                trace_id: "trace-approval",
+                span_id: "span-01",
+                parent_span_id: null,
+                step_name: "guardrail",
+                input_summary: "request safety screening",
+                output_summary: "approval required: approval-ui",
+                latency_ms: 0,
+                token_cost_estimate: 0,
+                error: null,
+              },
+            ],
+            latency_ms: 1.2,
+          }),
+        });
+      }
+      if (url === "/api/approvals/approval-ui/approve" && options?.method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            approval_request: {
+              approval_id: "approval-ui",
+              incident_id: "INC-1001",
+              question: "replay failed checkout event now",
+              action_type: "simulate_event_replay_plan",
+              permission_level: "action_simulated",
+              risk_reason: "unsafe_replay_or_action",
+              status: "approved",
+              requested_at: "2026-05-17T00:00:00Z",
+              decided_at: "2026-05-17T00:01:00Z",
+              decided_by: "local-operator",
+              note: "Approved from local UI demo.",
+              audit_log: [{ decision: "approved", actor: "local-operator", note: "Approved from local UI demo.", created_at: "2026-05-17T00:01:00Z" }],
+            },
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: false,
+        json: async () => ({}),
+      });
+    }));
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Run investigation" }));
+    expect(await screen.findByText("Approval required")).toBeInTheDocument();
+    expect(screen.getAllByText("unsafe_replay_or_action")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+
+    expect(await screen.findByText("Approval approved")).toBeInTheDocument();
+  });
 });

@@ -14,15 +14,18 @@ OperationAssistant is an AI operations assistant foundation for incident investi
 - Read-only function-calling tools for incident summaries, service metrics, failed events, and trace-like sample records, with JSON Schema compatible function contracts.
 - Product verifier checks that final answers reference retrieved citations and tool outputs.
 - Frontend investigation view with a final answer, tool call timeline, trace viewer, verifier badge, and citation cards.
+- Safety guardrails for prompt injection detection, PII redaction, unsafe replay/action classification, and default `safety_mode=enforce`.
+- Human approval requests and audit endpoints for action-like simulated remediation plans.
+- Frontend guardrail state and approval modal for approval-required investigation results.
+- Safety eval runner with `monitor_only` baseline and `enforce` improved mode.
 - Docker Compose services for PostgreSQL with pgvector and Redis.
 - PostgreSQL migrations for foundation tables plus document and chunk tables with pgvector embeddings.
 - Local runbook corpus under `data/runbooks/` and labeled retrieval eval cases under `evals/retrieval/`.
-- Labeled tool-use eval cases under `evals/tool_use/`.
+- Labeled tool-use eval cases under `evals/tool_use/` and labeled safety cases under `evals/safety/`.
 - Backend and frontend tests wired into GitHub Actions.
 
 ## Planned Later Capabilities
 
-- Add safety checks, approval gates for risky actions, and evaluation reports as the implementation matures.
 - Add semantic caching, async job handling, prompt/version tracking, and richer evaluation summary views.
 
 ## Planned Tech Stack
@@ -35,7 +38,7 @@ OperationAssistant is an AI operations assistant foundation for incident investi
 
 ## Current Status
 
-The current implementation is a runnable local foundation with benchmarkable runbook retrieval, source citations, read-only diagnostic tool calls, product verification, and traceable investigation steps. It does not include live LLM calls, write actions, approval gates, semantic caching, async jobs, or evaluation dashboards yet.
+The current implementation is a runnable local foundation with benchmarkable runbook retrieval, source citations, read-only diagnostic tool calls, product verification, traceable investigation steps, safety guardrails, and human approval gates for simulated action-like requests. It does not include live LLM calls, real write actions, semantic caching, async jobs, or evaluation dashboards yet.
 
 ## Local Development
 
@@ -87,4 +90,11 @@ Run investigation evals:
 ```bash
 .venv/bin/python scripts/eval_investigation.py --mode rag_only
 .venv/bin/python scripts/eval_investigation.py --mode agent_tools
+```
+
+Run safety evals:
+
+```bash
+.venv/bin/python scripts/eval_safety.py --safety-mode monitor_only
+.venv/bin/python scripts/eval_safety.py --safety-mode enforce
 ```

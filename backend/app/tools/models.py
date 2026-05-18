@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 
-ToolPermissionLevel = Literal["read_only"]
+ToolPermissionLevel = Literal["read_only", "planning", "action_simulated"]
 
 
 @dataclass(frozen=True)

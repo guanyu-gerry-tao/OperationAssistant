@@ -58,7 +58,7 @@ export type ToolCall = {
 export type ToolResult = {
   tool_name: string;
   arguments: Record<string, string>;
-  permission_level: "read_only";
+  permission_level: "read_only" | "planning" | "action_simulated";
   output: Record<string, unknown>;
   output_summary: string;
 };
@@ -90,6 +90,43 @@ export type VerificationResult = {
   checks: VerificationCheck[];
 };
 
+/** Guardrail decision returned before an investigation continues. */
+export type SafetyDecision = {
+  mode: "monitor_only" | "enforce";
+  decision: "allowed" | "blocked" | "approval_required";
+  original_text: string;
+  redacted_text: string;
+  reasons: string[];
+  prompt_injection_detected: boolean;
+  unsafe_request_detected: boolean;
+  pii_detected: boolean;
+  pii_redactions: string[];
+};
+
+/** Audit event attached to a human approval request. */
+export type ApprovalAuditEntry = {
+  decision: string;
+  actor: string;
+  note: string;
+  created_at: string;
+};
+
+/** Human approval request for an action-like simulated operation. */
+export type ApprovalRequest = {
+  approval_id: string;
+  incident_id: string;
+  question: string;
+  action_type: string;
+  permission_level: "action_simulated";
+  risk_reason: string;
+  status: "pending" | "approved" | "rejected";
+  requested_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  note: string | null;
+  audit_log: ApprovalAuditEntry[];
+};
+
 /** API response for one synchronous M3 investigation run. */
 export type InvestigationRun = {
   trace_id: string;
@@ -98,9 +135,11 @@ export type InvestigationRun = {
   mode: "rag_only" | "agent_tools";
   final_answer: string;
   retrieved_chunks: RetrievalChunk[];
+  safety_decision: SafetyDecision | null;
+  approval_request: ApprovalRequest | null;
   selected_tools: ToolCall[];
   tool_results: ToolResult[];
-  verifier: VerificationResult;
+  verifier: VerificationResult | null;
   trace: TraceSpan[];
   latency_ms: number;
 };
