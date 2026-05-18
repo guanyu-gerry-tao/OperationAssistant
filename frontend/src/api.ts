@@ -1,4 +1,4 @@
-import type { Incident, RetrievalPreview } from "./types";
+import type { Incident, InvestigationRun, RetrievalPreview } from "./types";
 
 // Keep a bundled copy of the seed incidents so the UI works before the API is running.
 export const seedIncidents: Incident[] = [
@@ -79,4 +79,30 @@ export async function fetchRetrievalPreview(
 
   // The API contract is covered by frontend and backend retrieval tests.
   return (await response.json()) as RetrievalPreview;
+}
+
+/** Run the synchronous M3 investigation workflow for a curated incident. */
+export async function createInvestigation(
+  incidentId: string,
+  question: string,
+  mode: InvestigationRun["mode"] = "agent_tools",
+): Promise<InvestigationRun> {
+  // POST keeps the run request explicit because it creates a trace in the backend store.
+  const response = await fetch("/api/investigations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      incident_id: incidentId,
+      question,
+      mode,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Investigation failed");
+  }
+
+  // The M3 UI renders citations, tool results, verifier checks, and trace spans.
+  return (await response.json()) as InvestigationRun;
 }

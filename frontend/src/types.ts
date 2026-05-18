@@ -46,3 +46,61 @@ export type RetrievalPreview = {
   chunks: RetrievalChunk[];
   latency_ms?: number;
 };
+
+/** Read-only tool call selected by the M3 investigation workflow. */
+export type ToolCall = {
+  tool_name: string;
+  arguments: Record<string, string>;
+  reason: string;
+};
+
+/** Read-only sample tool output rendered in the tool timeline. */
+export type ToolResult = {
+  tool_name: string;
+  arguments: Record<string, string>;
+  permission_level: "read_only";
+  output: Record<string, unknown>;
+  output_summary: string;
+};
+
+/** One OpenTelemetry-style span captured during an investigation run. */
+export type TraceSpan = {
+  trace_id: string;
+  span_id: string;
+  parent_span_id: string | null;
+  step_name: string;
+  input_summary: string;
+  output_summary: string;
+  latency_ms: number;
+  token_cost_estimate: number;
+  error: string | null;
+};
+
+/** Product verifier check shown in the investigation panel. */
+export type VerificationCheck = {
+  name: string;
+  passed: boolean;
+  detail: string;
+};
+
+/** Product verifier result for the runtime final answer. */
+export type VerificationResult = {
+  status: string;
+  grounded: boolean;
+  checks: VerificationCheck[];
+};
+
+/** API response for one synchronous M3 investigation run. */
+export type InvestigationRun = {
+  trace_id: string;
+  incident_id: string;
+  question: string;
+  mode: "rag_only" | "agent_tools";
+  final_answer: string;
+  retrieved_chunks: RetrievalChunk[];
+  selected_tools: ToolCall[];
+  tool_results: ToolResult[];
+  verifier: VerificationResult;
+  trace: TraceSpan[];
+  latency_ms: number;
+};

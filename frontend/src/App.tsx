@@ -1,21 +1,19 @@
-import { Activity, Database, FileSearch, Server, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  CheckCircle2,
+  Database,
+  FileSearch,
+  GitBranch,
+  Server,
+  ShieldCheck,
+  Wrench,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { fetchIncidents, fetchRetrievalPreview, seedIncidents } from "./api";
-import type { Incident, Investigation, RetrievalPreview } from "./types";
+import { createInvestigation, fetchIncidents, fetchRetrievalPreview, seedIncidents } from "./api";
+import type { Incident, InvestigationRun, RetrievalPreview } from "./types";
 import "./styles.css";
-
-
-/** Build the honest M1 placeholder before retrieval and tool calls exist. */
-function buildPlaceholderInvestigation(incident: Incident): Investigation {
-  return {
-    status: "placeholder",
-    summary:
-      "M1 provides the runnable incident shell. Retrieval, citations, tool calls, and verification are planned for later milestones.",
-    primary_signal: incident.symptom,
-    next_capability: "M2 retrieval and citations"
-  };
-}
 
 
 /** Render seed timestamps in a compact, readable form for the UI shell. */
@@ -30,13 +28,23 @@ function formatStartedAt(value: string): string {
 }
 
 
-/** Render the M1 incident investigation workspace shell. */
+/** Build a useful default investigation question for the selected incident. */
+function buildDefaultQuestion(incident: Incident): string {
+  return `why did ${incident.service} show ${incident.likely_area}`;
+}
+
+
+/** Render the incident investigation workspace. */
 export default function App() {
   const [incidents, setIncidents] = useState<Incident[]>(seedIncidents);
   const [selectedIncidentId, setSelectedIncidentId] = useState(seedIncidents[0].id);
   const [retrievalQuery, setRetrievalQuery] = useState("why did checkout payment retries exhaust");
   const [retrievalPreview, setRetrievalPreview] = useState<RetrievalPreview | null>(null);
   const [retrievalStatus, setRetrievalStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [investigationQuestion, setInvestigationQuestion] = useState(buildDefaultQuestion(seedIncidents[0]));
+  const [investigationMode, setInvestigationMode] = useState<InvestigationRun["mode"]>("agent_tools");
+  const [investigationRun, setInvestigationRun] = useState<InvestigationRun | null>(null);
+  const [investigationStatus, setInvestigationStatus] = useState<"idle" | "loading" | "error">("idle");
 
   useEffect(() => {
     // Replace bundled demo data with API data when the backend is available.
@@ -69,9 +77,6 @@ export default function App() {
     );
   }
 
-  // M1 computes the placeholder locally because retrieval has not been implemented yet.
-  const investigation = buildPlaceholderInvestigation(selectedIncident);
-
   /** Load ranked runbook chunks for the current preview query. */
   async function runRetrievalPreview() {
     // Show loading state while the FastAPI retrieval endpoint ranks chunks.
@@ -86,6 +91,31 @@ export default function App() {
     }
   }
 
+  /** Run the M3 workflow and render citations, tools, verifier, and trace. */
+  async function runInvestigation() {
+    // Show loading state while the FastAPI workflow executes synchronously.
+    setInvestigationStatus("loading");
+    try {
+      const result = await createInvestigation(
+        selectedIncident.id,
+        investigationQuestion,
+        investigationMode,
+      );
+      setInvestigationRun(result);
+      setInvestigationStatus("idle");
+    } catch {
+      // Preserve the last successful investigation so operators can still inspect it.
+      setInvestigationStatus("error");
+    }
+  }
+
+  /** Select an incident and reset investigation inputs to that incident's context. */
+  function selectIncident(incident: Incident) {
+    setSelectedIncidentId(incident.id);
+    setInvestigationQuestion(buildDefaultQuestion(incident));
+    setInvestigationRun(null);
+  }
+
   return (
     <main className="app-shell">
       <section className="workspace-header">
@@ -93,11 +123,12 @@ export default function App() {
           <p className="eyebrow">Operations Assistant</p>
           <h1>Incident investigation workspace</h1>
         </div>
-        <div className="status-strip" aria-label="M1 stack status">
+        <div className="status-strip" aria-label="Stack status">
           <span><Server size={16} /> FastAPI</span>
           <span><Activity size={16} /> React</span>
           <span><Database size={16} /> Postgres + Redis</span>
-          <span><ShieldCheck size={16} /> Seed data</span>
+          <span><Bot size={16} /> Agent tools</span>
+          <span><GitBranch size={16} /> Traces</span>
         </div>
       </section>
 
@@ -111,7 +142,7 @@ export default function App() {
             <button
               className={incident.id === selectedIncident.id ? "incident-row active" : "incident-row"}
               key={incident.id}
-              onClick={() => setSelectedIncidentId(incident.id)}
+              onClick={() => selectIncident(incident)}
               type="button"
             >
               <span className={`severity severity-${incident.severity}`}>{incident.severity}</span>
@@ -145,17 +176,102 @@ export default function App() {
             </div>
           </dl>
 
-          <div className="investigation-panel">
+          <div className="investigation-panel" aria-label="Investigation workflow">
             <div className="panel-heading">
-              <h3>Investigation placeholder</h3>
-              <span>{investigation.status}</span>
+              <h3>Investigation workflow</h3>
+              <span>{investigationRun?.mode ?? investigationMode}</span>
             </div>
-            <p>{investigation.summary}</p>
-            <div className="signal-box">
-              <span>Primary signal</span>
-              <strong>{investigation.primary_signal}</strong>
+            <div className="investigation-controls">
+              <label htmlFor="investigation-question">Question</label>
+              <textarea
+                id="investigation-question"
+                onChange={(event) => setInvestigationQuestion(event.target.value)}
+                value={investigationQuestion}
+              />
+              <div className="segmented-control" aria-label="Investigation mode">
+                <button
+                  className={investigationMode === "agent_tools" ? "active" : ""}
+                  onClick={() => setInvestigationMode("agent_tools")}
+                  type="button"
+                >
+                  <Wrench size={16} />
+                  Agent tools
+                </button>
+                <button
+                  className={investigationMode === "rag_only" ? "active" : ""}
+                  onClick={() => setInvestigationMode("rag_only")}
+                  type="button"
+                >
+                  <FileSearch size={16} />
+                  RAG only
+                </button>
+              </div>
+              <button className="primary-action" onClick={runInvestigation} type="button">
+                <Bot size={16} />
+                Run investigation
+              </button>
             </div>
-            <p className="next-capability">{investigation.next_capability}</p>
+            {investigationStatus === "error" ? (
+              <p className="error-text">Investigation workflow is unavailable.</p>
+            ) : null}
+            {investigationRun !== null ? (
+              <div className="investigation-results">
+                <div className={`verifier-badge verifier-${investigationRun.verifier.status}`}>
+                  <CheckCircle2 size={16} />
+                  <strong>Verifier {investigationRun.verifier.status}</strong>
+                  <span>{investigationRun.trace_id}</span>
+                </div>
+                <div className="answer-box">
+                  <span>Final answer</span>
+                  <p>{investigationRun.final_answer}</p>
+                </div>
+                <div className="timeline-grid">
+                  <section aria-label="Tool call timeline">
+                    <h4>Tool call timeline</h4>
+                    {investigationRun.tool_results.length > 0 ? (
+                      investigationRun.tool_results.map((toolResult) => (
+                        <article className="timeline-item" key={`${toolResult.tool_name}-${toolResult.output_summary}`}>
+                          <span>{toolResult.permission_level}</span>
+                          <strong>{toolResult.tool_name}</strong>
+                          <p>{toolResult.output_summary}</p>
+                        </article>
+                      ))
+                    ) : (
+                      <p className="muted-text">Baseline mode did not call read-only tools.</p>
+                    )}
+                  </section>
+                  <section aria-label="Trace viewer">
+                    <h4>Trace viewer</h4>
+                    {investigationRun.trace.map((span) => (
+                      <article className="trace-row" key={span.span_id}>
+                        <div>
+                          <strong>{span.step_name}</strong>
+                          <span>{span.latency_ms.toFixed(2)} ms</span>
+                        </div>
+                        <p>{span.output_summary}</p>
+                      </article>
+                    ))}
+                  </section>
+                </div>
+                <div className="retrieval-results">
+                  {investigationRun.retrieved_chunks.map((chunk) => (
+                    <article className="retrieval-result" key={`investigation-${chunk.chunk_id}`}>
+                      <div>
+                        <h4>{chunk.title}</h4>
+                        <span>{chunk.source_id} · score {chunk.score.toFixed(2)}</span>
+                      </div>
+                      <p>{chunk.snippet}</p>
+                      <small>Source: {chunk.citation.source_path}</small>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="signal-box">
+                <span>Primary signal</span>
+                <strong>{selectedIncident.symptom}</strong>
+              </div>
+            )}
           </div>
 
           <div className="retrieval-panel" aria-label="Retrieval preview">
