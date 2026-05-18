@@ -1,4 +1,4 @@
-import type { Incident, InvestigationRun, RetrievalPreview } from "./types";
+import type { ApprovalRequest, Incident, InvestigationRun, RetrievalPreview } from "./types";
 
 // Keep a bundled copy of the seed incidents so the UI works before the API is running.
 export const seedIncidents: Incident[] = [
@@ -105,4 +105,28 @@ export async function createInvestigation(
 
   // The M3 UI renders citations, tool results, verifier checks, and trace spans.
   return (await response.json()) as InvestigationRun;
+}
+
+/** Approve or reject a pending simulated action request. */
+export async function decideApproval(
+  approvalId: string,
+  decision: "approve" | "reject",
+): Promise<ApprovalRequest> {
+  // The local UI uses a deterministic operator identity for the demo audit trail.
+  const response = await fetch(`/api/approvals/${approvalId}/${decision}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      decided_by: "local-operator",
+      note: decision === "approve" ? "Approved from local UI demo." : "Rejected from local UI demo.",
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Approval decision failed");
+  }
+
+  const payload = (await response.json()) as { approval_request: ApprovalRequest };
+  return payload.approval_request;
 }

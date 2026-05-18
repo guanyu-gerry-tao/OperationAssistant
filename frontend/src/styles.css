@@ -295,7 +295,8 @@ button {
   margin-top: 16px;
 }
 
-.verifier-badge {
+.verifier-badge,
+.guardrail-badge {
   align-items: center;
   border-radius: 6px;
   display: flex;
@@ -304,7 +305,8 @@ button {
   padding: 12px;
 }
 
-.verifier-badge span {
+.verifier-badge span,
+.guardrail-badge span {
   color: #5f6b65;
   font-size: 13px;
 }
@@ -319,6 +321,62 @@ button {
   background: #fae1d5;
   border: 1px solid #edb7a4;
   color: #8d3219;
+}
+
+.guardrail-allowed {
+  background: #e6f3ec;
+  border: 1px solid #b8d8c8;
+  color: #22553a;
+}
+
+.guardrail-approval_required {
+  background: #fff0c7;
+  border: 1px solid #e3c56e;
+  color: #725006;
+}
+
+.guardrail-blocked {
+  background: #fae1d5;
+  border: 1px solid #edb7a4;
+  color: #8d3219;
+}
+
+.approval-modal {
+  background: #fbfcfa;
+  border: 1px solid #d8dfda;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.approval-modal h4 {
+  margin: 4px 0 6px;
+}
+
+.approval-modal span,
+.approval-modal small {
+  color: #5f6b65;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.approval-actions button {
+  background: #ffffff;
+  border: 1px solid #cbd5cf;
+  border-radius: 6px;
+  color: #24322f;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 8px 12px;
 }
 
 .answer-box,

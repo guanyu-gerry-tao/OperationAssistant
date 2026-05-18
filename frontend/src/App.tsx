@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { createInvestigation, fetchIncidents, fetchRetrievalPreview, seedIncidents } from "./api";
-import type { Incident, InvestigationRun, RetrievalPreview } from "./types";
+import { createInvestigation, decideApproval, fetchIncidents, fetchRetrievalPreview, seedIncidents } from "./api";
+import type { ApprovalRequest, Incident, InvestigationRun, RetrievalPreview } from "./types";
 import "./styles.css";
 
 
@@ -44,6 +44,8 @@ export default function App() {
   const [investigationMode, setInvestigationMode] = useState<InvestigationRun["mode"]>("agent_tools");
   const [investigationRun, setInvestigationRun] = useState<InvestigationRun | null>(null);
   const [investigationStatus, setInvestigationStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [approvalRequest, setApprovalRequest] = useState<ApprovalRequest | null>(null);
+  const [approvalStatus, setApprovalStatus] = useState<"idle" | "loading" | "error">("idle");
 
   useEffect(() => {
     // Replace bundled demo data with API data when the backend is available.
@@ -101,6 +103,7 @@ export default function App() {
         investigationMode,
       );
       setInvestigationRun(result);
+      setApprovalRequest(result.approval_request ?? null);
       setInvestigationStatus("idle");
     } catch {
       // Preserve the last successful investigation so operators can still inspect it.
@@ -113,6 +116,24 @@ export default function App() {
     setSelectedIncidentId(incident.id);
     setInvestigationQuestion(buildDefaultQuestion(incident));
     setInvestigationRun(null);
+    setApprovalRequest(null);
+  }
+
+  /** Submit a human approval decision and update the modal state. */
+  async function submitApprovalDecision(decision: "approve" | "reject") {
+    if (approvalRequest === null) {
+      return;
+    }
+
+    // Keep the modal visible while the audit endpoint records the decision.
+    setApprovalStatus("loading");
+    try {
+      const nextApprovalRequest = await decideApproval(approvalRequest.approval_id, decision);
+      setApprovalRequest(nextApprovalRequest);
+      setApprovalStatus("idle");
+    } catch {
+      setApprovalStatus("error");
+    }
   }
 
   return (
@@ -215,11 +236,53 @@ export default function App() {
             ) : null}
             {investigationRun !== null ? (
               <div className="investigation-results">
-                <div className={`verifier-badge verifier-${investigationRun.verifier.status}`}>
-                  <CheckCircle2 size={16} />
-                  <strong>Verifier {investigationRun.verifier.status}</strong>
-                  <span>{investigationRun.trace_id}</span>
-                </div>
+                {investigationRun.safety_decision != null ? (
+                  <div className={`guardrail-badge guardrail-${investigationRun.safety_decision.decision}`}>
+                    <CheckCircle2 size={16} />
+                    <strong>
+                      {investigationRun.safety_decision.decision === "approval_required"
+                        ? "Approval required"
+                        : `Guardrail ${investigationRun.safety_decision.decision}`}
+                    </strong>
+                    <span>{investigationRun.safety_decision.reasons.join(", ") || "no risks detected"}</span>
+                  </div>
+                ) : null}
+                {investigationRun.verifier != null ? (
+                  <div className={`verifier-badge verifier-${investigationRun.verifier.status}`}>
+                    <CheckCircle2 size={16} />
+                    <strong>Verifier {investigationRun.verifier.status}</strong>
+                    <span>{investigationRun.trace_id}</span>
+                  </div>
+                ) : null}
+                {approvalRequest !== null ? (
+                  <section className="approval-modal" aria-label="Approval request">
+                    <div>
+                      <span>{approvalRequest.permission_level}</span>
+                      <h4>
+                        Approval {approvalRequest.status}
+                      </h4>
+                      <p>{approvalRequest.risk_reason}</p>
+                      <small>{approvalRequest.approval_id}</small>
+                    </div>
+                    {approvalRequest.status === "pending" ? (
+                      <div className="approval-actions">
+                        <button onClick={() => void submitApprovalDecision("approve")} type="button">
+                          Approve
+                        </button>
+                        <button onClick={() => void submitApprovalDecision("reject")} type="button">
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="muted-text">
+                        Decided by {approvalRequest.decided_by} · {approvalRequest.note}
+                      </p>
+                    )}
+                    {approvalStatus === "error" ? (
+                      <p className="error-text">Approval decision could not be saved.</p>
+                    ) : null}
+                  </section>
+                ) : null}
                 <div className="answer-box">
                   <span>Final answer</span>
                   <p>{investigationRun.final_answer}</p>
