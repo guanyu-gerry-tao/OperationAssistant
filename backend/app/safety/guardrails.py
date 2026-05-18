@@ -17,7 +17,7 @@ PROMPT_INJECTION_PATTERNS = [
 HIGH_RISK_ACTION_TERMS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
-        r"\b(replay|rerun|restart|rollback|deploy|refund)\b",
+        r"\b(replay|rerun|restart|rollback|roll\s+back|deploy|refund)\b",
     ]
 ]
 
@@ -133,11 +133,11 @@ def _detect_unsafe_action_request(text: str) -> bool:
 
     normalized_text = text.strip().lower()
     starts_with_high_risk_action = re.match(
-        r"^(please\s+)?(replay|rerun|restart|rollback|deploy|refund)\b",
+        r"^(please\s+)?(replay|rerun|restart|rollback|roll\s+back|deploy|refund|retry)\b",
         normalized_text,
     ) is not None
     asks_to_perform_high_risk_action = re.search(
-        r"\b(can you|could you|please|go ahead and)\s+(replay|rerun|restart|rollback|deploy|refund)\b",
+        r"\b(can you|could you|please|go ahead and)\s+(replay|rerun|restart|rollback|roll\s+back|deploy|refund|retry)\b",
         normalized_text,
     ) is not None
     if starts_with_high_risk_action or asks_to_perform_high_risk_action:

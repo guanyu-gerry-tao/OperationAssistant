@@ -1,6 +1,11 @@
 from fastapi.testclient import TestClient
 
-from backend.app.approvals.store import create_approval_request, decide_approval_request, reset_approval_store
+from backend.app.approvals.store import (
+    create_approval_request,
+    decide_approval_request,
+    get_approval_request,
+    reset_approval_store,
+)
 from backend.app.main import app
 from backend.app.safety.guardrails import evaluate_safety
 from backend.app.tools.models import ToolCall
@@ -129,6 +134,9 @@ def test_action_simulated_tool_returns_plan_after_approval() -> None:
     assert result.permission_level == "action_simulated"
     assert result.output["simulation_only"] is True
     assert result.output_summary == "simulated replay plan prepared after human approval"
+    stored_approval = get_approval_request(approval_request.approval_id)
+    assert stored_approval is not None
+    assert stored_approval.audit_log[-1].decision == "executed_simulation"
 
 
 def test_action_simulated_tool_rejects_pending_or_mismatched_approval() -> None:
@@ -151,6 +159,31 @@ def test_action_simulated_tool_rejects_pending_or_mismatched_approval() -> None:
         decided_by="operator@example.com",
         note="approved wrong incident",
     )
+    wrong_action_approval = create_approval_request(
+        incident_id="INC-1001",
+        question="replay the failed checkout event",
+        action_type="different_action",
+        risk_reason="unsafe_replay_or_action",
+    )
+    decide_approval_request(
+        approval_id=wrong_action_approval.approval_id,
+        decision="approved",
+        decided_by="operator@example.com",
+        note="approved wrong action",
+    )
+    wrong_permission_approval = create_approval_request(
+        incident_id="INC-1001",
+        question="replay the failed checkout event",
+        action_type="simulate_event_replay_plan",
+        risk_reason="unsafe_replay_or_action",
+    )
+    decide_approval_request(
+        approval_id=wrong_permission_approval.approval_id,
+        decision="approved",
+        decided_by="operator@example.com",
+        note="approved wrong permission",
+    )
+    wrong_permission_approval.permission_level = "planning"
     call = ToolCall(
         tool_name="simulate_event_replay_plan",
         arguments={"incident_id": "INC-1001", "rationale": "operator approved simulated planning"},
@@ -158,7 +191,12 @@ def test_action_simulated_tool_rejects_pending_or_mismatched_approval() -> None:
     )
 
     # A real approval gate must bind status and incident, not only accept any id.
-    for approval_id in [pending_approval.approval_id, other_incident_approval.approval_id]:
+    for approval_id in [
+        pending_approval.approval_id,
+        other_incident_approval.approval_id,
+        wrong_action_approval.approval_id,
+        wrong_permission_approval.approval_id,
+    ]:
         try:
             execute_tool(call, approval_id=approval_id)
         except ValueError as exc:
@@ -210,9 +248,12 @@ def test_bare_high_risk_action_requests_require_approval() -> None:
     risky_queries = [
         "refund this order",
         "rollback checkout",
+        "roll back checkout",
+        "please roll back checkout",
         "deploy the fix",
         "restart the notification worker",
         "replay the failed event",
+        "retry this failed event",
     ]
 
     # High-risk action verbs should not require magic words like "now" to be caught.
@@ -222,10 +263,16 @@ def test_bare_high_risk_action_requests_require_approval() -> None:
 
 
 def test_safe_retry_inspection_query_remains_allowed() -> None:
-    decision = evaluate_safety("check retry counters for the failed event", safety_mode="enforce")
+    safe_queries = [
+        "check retry counters for the failed event",
+        "inspect retries for the failed event",
+        "show retry history for the failed event",
+    ]
 
     # Inspecting retry evidence is a safe investigation request, not an action execution request.
-    assert decision.decision == "allowed"
+    for query in safe_queries:
+        decision = evaluate_safety(query, safety_mode="enforce")
+        assert decision.decision == "allowed"
 
 
 def test_redaction_trace_uses_triage_parent_for_tool_select_and_answer() -> None:

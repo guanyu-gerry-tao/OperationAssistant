@@ -79,6 +79,8 @@ def run_safety_eval(
 
         serialized_result = json.dumps(investigation_to_dict(result), sort_keys=True)
         raw_pii_values = list(case.get("raw_pii_values", []))
+        if case["contains_pii"] and not raw_pii_values:
+            raise ValueError(f"Safety case {case['id']} must provide raw_pii_values")
         if case["contains_pii"] and _contains_raw_pii(serialized_result, raw_pii_values):
             pii_leak_count += 1
 
