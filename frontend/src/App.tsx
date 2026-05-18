@@ -1,5 +1,6 @@
 import {
   Activity,
+  BarChart3,
   Bot,
   CheckCircle2,
   Database,
@@ -10,8 +11,15 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { createInvestigation, decideApproval, fetchIncidents, fetchRetrievalPreview, seedIncidents } from "./api";
-import type { ApprovalRequest, Incident, InvestigationRun, RetrievalPreview } from "./types";
+import {
+  createInvestigation,
+  decideApproval,
+  fetchIncidents,
+  fetchLatestEvalSummary,
+  fetchRetrievalPreview,
+  seedIncidents
+} from "./api";
+import type { ApprovalRequest, Incident, InvestigationRun, LatestEvalSummary, RetrievalPreview } from "./types";
 import "./styles.css";
 
 
@@ -33,6 +41,19 @@ function buildDefaultQuestion(incident: Incident): string {
 }
 
 
+/** Render one compact quality metric card from the latest eval summary. */
+function renderQualityMetric(label: string, value: number | undefined) {
+  const displayValue = value === undefined ? "n/a" : value.toFixed(2);
+
+  return (
+    <article className="quality-metric" key={label}>
+      <span>{label}</span>
+      <strong>{displayValue}</strong>
+    </article>
+  );
+}
+
+
 /** Render the incident investigation workspace. */
 export default function App() {
   const [incidents, setIncidents] = useState<Incident[]>(seedIncidents);
@@ -46,6 +67,7 @@ export default function App() {
   const [investigationStatus, setInvestigationStatus] = useState<"idle" | "loading" | "error">("idle");
   const [approvalRequest, setApprovalRequest] = useState<ApprovalRequest | null>(null);
   const [approvalStatus, setApprovalStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [latestEvalSummary, setLatestEvalSummary] = useState<LatestEvalSummary | null>(null);
 
   useEffect(() => {
     // Replace bundled demo data with API data when the backend is available.
@@ -55,6 +77,13 @@ export default function App() {
         // Select the first API incident so the detail panel stays in sync with the list.
         setSelectedIncidentId(nextIncidents[0].id);
       }
+    });
+  }, []);
+
+  useEffect(() => {
+    // Load the latest eval artifact when scripts/eval_all.py has produced one locally.
+    void fetchLatestEvalSummary().then((summary) => {
+      setLatestEvalSummary(summary);
     });
   }, []);
 
@@ -195,6 +224,36 @@ export default function App() {
               <dd>{selectedIncident.customer_impact}</dd>
             </div>
           </dl>
+
+          <section className="eval-summary-panel" aria-label="Latest eval summary">
+            <div className="panel-heading">
+              <h3>Latest eval run</h3>
+              <span>{latestEvalSummary?.arm ?? "not run"}</span>
+            </div>
+            {latestEvalSummary !== null ? (
+              <>
+                <div className="eval-run-meta">
+                  <BarChart3 size={18} />
+                  <strong>{latestEvalSummary.run_id}</strong>
+                  <span>{latestEvalSummary.case_count} cases</span>
+                </div>
+                <div className="quality-metric-grid">
+                  {renderQualityMetric("Retrieval precision", latestEvalSummary.metrics.retrieval_precision)}
+                  {renderQualityMetric("Tool selection", latestEvalSummary.metrics.tool_selection_accuracy)}
+                  {renderQualityMetric("Grounded answer rate", latestEvalSummary.metrics.grounded_answer_rate)}
+                  {renderQualityMetric("Hallucination rate", latestEvalSummary.metrics.hallucination_rate)}
+                  {renderQualityMetric("Cache hit rate", latestEvalSummary.metrics.cache_hit_rate)}
+                </div>
+                <div className="version-strip">
+                  <span>Prompt</span>
+                  <strong>{latestEvalSummary.version_snapshot.prompt_versions?.investigation_answer ?? "unversioned"}</strong>
+                  <span>{latestEvalSummary.version_snapshot.model_profile ?? "local model"}</span>
+                </div>
+              </>
+            ) : (
+              <p className="muted-text">Run the full eval script to populate quality gate metrics.</p>
+            )}
+          </section>
 
           <div className="investigation-panel" aria-label="Investigation workflow">
             <div className="panel-heading">

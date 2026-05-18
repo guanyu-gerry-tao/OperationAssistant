@@ -4,7 +4,7 @@ FRONTEND_PORT := 5173
 DATABASE_URL := postgresql://operation_assistant:operation_assistant@127.0.0.1:15432/operation_assistant
 REDIS_URL := redis://127.0.0.1:16379/0
 
-.PHONY: install dev test test-backend test-frontend build-frontend
+.PHONY: install dev test test-backend test-frontend build-frontend eval-smoke
 
 install:
 	$(PYTHON) -m pip install -e '.[dev]'
@@ -28,3 +28,7 @@ test-frontend:
 
 build-frontend:
 	npm --prefix frontend run build
+
+eval-smoke:
+	$(PYTHON) scripts/eval_all.py --arm baseline --limit 12 --output-dir evals/tmp/ci-baseline
+	$(PYTHON) scripts/eval_all.py --arm improved --limit 12 --output-dir evals/tmp/ci-improved
