@@ -1,0 +1,25 @@
+{
+  "runbooks": [
+    {
+      "id": "RB-1001",
+      "title": "Workflow retry exhaustion checklist",
+      "service": "checkout-workflow",
+      "source_path": "data/runbooks/workflow_retry_exhaustion.md",
+      "incident_pattern": "failed workflow retry plan"
+    },
+    {
+      "id": "RB-1002",
+      "title": "Partner feed validation incident notes",
+      "service": "inventory-sync",
+      "source_path": "data/runbooks/partner_feed_validation.md",
+      "incident_pattern": "error rate increase"
+    },
+    {
+      "id": "RB-1003",
+      "title": "Queue latency investigation checklist",
+      "service": "notification-worker",
+      "source_path": "data/runbooks/queue_latency.md",
+      "incident_pattern": "latency spike"
+    }
+  ]
+}
