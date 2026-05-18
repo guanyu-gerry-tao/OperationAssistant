@@ -9,6 +9,7 @@ class GroundednessJudgment:
     hallucinated: bool
     missing_facts: list[str]
     missing_tools: list[str]
+    unsupported_facts: list[str]
     citation_mismatch_count: int
 
     def to_dict(self) -> dict[str, object]:
@@ -19,6 +20,7 @@ class GroundednessJudgment:
             "hallucinated": self.hallucinated,
             "missing_facts": self.missing_facts,
             "missing_tools": self.missing_tools,
+            "unsupported_facts": self.unsupported_facts,
             "citation_mismatch_count": self.citation_mismatch_count,
         }
 
@@ -31,6 +33,7 @@ def judge_grounded_answer(
     returned_sources: list[str],
     expected_tools: list[str],
     selected_tools: list[str],
+    forbidden_facts: list[str] | None = None,
 ) -> GroundednessJudgment:
     """Score groundedness from labels instead of product verifier self-assessment."""
 
@@ -61,11 +64,19 @@ def judge_grounded_answer(
         if tool_name not in selected_tool_set
     ]
 
-    grounded = not missing_facts and citation_mismatch_count == 0 and not missing_tools
+    # Hallucination proxy is intentionally separate from grounding failure.
+    unsupported_facts = [
+        fact
+        for fact in forbidden_facts or []
+        if fact.lower() in normalized_answer
+    ]
+
+    grounded = not missing_facts and citation_mismatch_count == 0 and not missing_tools and not unsupported_facts
     return GroundednessJudgment(
         grounded=grounded,
-        hallucinated=not grounded,
+        hallucinated=bool(unsupported_facts),
         missing_facts=missing_facts,
         missing_tools=missing_tools,
+        unsupported_facts=unsupported_facts,
         citation_mismatch_count=citation_mismatch_count,
     )

@@ -30,5 +30,5 @@ build-frontend:
 	npm --prefix frontend run build
 
 eval-smoke:
-	$(PYTHON) scripts/eval_all.py --arm baseline --limit 12 --output-dir evals/tmp/ci-baseline
-	$(PYTHON) scripts/eval_all.py --arm improved --limit 12 --output-dir evals/tmp/ci-improved
+	$(PYTHON) scripts/eval_all.py --arm baseline --limit 12 --output-dir evals/tmp/ci-baseline --check-thresholds
+	$(PYTHON) scripts/eval_all.py --arm improved --limit 12 --output-dir evals/tmp/ci-improved --check-thresholds

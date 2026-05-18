@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_LATEST_SUMMARY_PATH = Path("evals/results/full/latest_summary.json")
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_LATEST_SUMMARY_PATH = REPO_ROOT / "evals/results/full/latest_summary.json"
 
 
 def load_latest_eval_summary(path: Path | None = None) -> dict[str, Any]:

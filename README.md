@@ -108,6 +108,7 @@ Run the unified quality gate:
 ```bash
 .venv/bin/python scripts/eval_all.py --arm baseline
 .venv/bin/python scripts/eval_all.py --arm improved
+.venv/bin/python scripts/eval_all.py --arm improved --limit 12 --check-thresholds
 ```
 
 Run the fast CI-style eval smoke locally:

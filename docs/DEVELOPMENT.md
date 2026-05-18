@@ -75,8 +75,8 @@ Current checks:
 .venv/bin/python -m pytest tests/backend -q
 npm --prefix frontend test
 npm --prefix frontend run build
-.venv/bin/python scripts/eval_all.py --arm baseline --limit 12 --output-dir evals/tmp/ci-baseline
-.venv/bin/python scripts/eval_all.py --arm improved --limit 12 --output-dir evals/tmp/ci-improved
+.venv/bin/python scripts/eval_all.py --arm baseline --limit 12 --output-dir evals/tmp/ci-baseline --check-thresholds
+.venv/bin/python scripts/eval_all.py --arm improved --limit 12 --output-dir evals/tmp/ci-improved --check-thresholds
 ```
 
 `make test` runs backend/frontend checks. `make eval-smoke` runs the fast baseline/improved eval smoke used by CI.
@@ -115,7 +115,7 @@ Unified full eval commands:
 .venv/bin/python scripts/eval_all.py --arm improved
 ```
 
-The unified runner uses `evals/datasets/full_quality_cases.json` and writes generated JSON, Markdown, and `latest_summary.json` artifacts under `evals/results/full/`. It reports retrieval precision, citation coverage, tool-selection accuracy, tool-argument accuracy, grounded-answer rate, hallucination rate, safety decision accuracy, unsafe-pass rate, PII leak count, approval-required coverage, cache hit rate, latency, and token-cost estimate. The latest summary endpoint reads the generated `latest_summary.json` so the frontend can display the newest local quality gate run.
+The unified runner uses `evals/datasets/full_quality_cases.json` and writes generated JSON, Markdown, and `latest_summary.json` artifacts under `evals/results/full/`. It reports retrieval precision, citation coverage, tool-selection accuracy, tool-argument accuracy, grounded-answer rate, grounding-failure rate, hallucination proxy rate, safety decision accuracy, unsafe-pass rate, PII leak count, approval-required coverage, cache hit rate, latency, and token-cost estimate. The latest summary endpoint reads the generated `latest_summary.json` so the frontend can display the newest local quality gate run. Add `--check-thresholds` for CI-style smoke thresholds.
 
 ## Retrieval Development Notes
 
@@ -152,7 +152,7 @@ The unified runner uses `evals/datasets/full_quality_cases.json` and writes gene
 - The full dataset covers retrieval, tool use, safety, grounded-answer, and cache cases.
 - The offline eval judge scores expected sources, expected facts, and expected tools from labels. It does not reuse product verifier status as the only groundedness signal.
 - The default runtime path remains improved: hybrid retrieval, agent tools, runtime verifier, and enforced safety. Baseline arms exist for eval and debugging.
-- The cache metric in M5 is an eval-arm semantic-cache check built from normalized query, retrieval context, prompt version, and safety mode. Durable Redis-backed runtime caching is still a later capability.
+- The cache metric in M5 is an eval-arm semantic-cache check built from normalized query, actual retrieved context ids, prompt version, and safety mode. Durable Redis-backed runtime caching is still a later capability.
 - Prompt/model/tool/guardrail version metadata is stored in `backend/app/prompts/registry.py` and copied into full eval reports.
 - Lightweight feedback helpers live in `backend/app/feedback/`; they provide a local JSONL loop for quality labels without becoming a production analytics system.
 
