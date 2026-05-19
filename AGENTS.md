@@ -28,12 +28,22 @@
 - Do not manually squash local branch commits before opening a PR unless the user explicitly asks.
 - Preserve useful logical commits on the branch for review; `main` stays clean through GitHub squash merge.
 - Create PRs by milestone.
+- Commit and push public implementation files only. Do not commit ignored private files.
 - Prefer one Codex goal per milestone when using goal-based execution.
 - Milestones should have a clear done state and should avoid unnecessary decision branches.
 - If a milestone requires a decision, document the recommended default and ask the user only when the choice materially changes scope, cost, or architecture.
 - Agents may create commits and open PRs when a milestone or coherent logical step is complete.
 - Agents must not merge PRs by themselves.
 - When refactoring or deleting meaningful code, make a dedicated commit when the change is substantial enough to review independently.
+
+## Private Files And Git
+
+- `AGENTS.override.md`, `docs/internal/`, and `Archive/` are private local files and are intentionally ignored.
+- Write required private reports and highlight inventories locally, but do not stage, commit, push, or force-add them.
+- Never use `git add -f` for ignored private files unless the user explicitly asks.
+- If `git status --ignored` shows private files as ignored, leave them ignored.
+- If a private file is already tracked from older work, do not modify or include it in a PR unless the user explicitly asks for a private-doc cleanup PR.
+- PR descriptions, commit messages, public docs, and code comments must not reference private internal files or hidden project positioning.
 
 ## Benchmarkable Baselines
 
