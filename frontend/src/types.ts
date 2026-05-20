@@ -143,3 +143,22 @@ export type InvestigationRun = {
   trace: TraceSpan[];
   latency_ms: number;
 };
+
+/** Version metadata attached to a local eval run. */
+export type EvalVersionSnapshot = {
+  prompt_versions?: Record<string, string>;
+  model_profile?: string;
+  tool_registry_version?: string;
+  guardrail_policy_version?: string;
+  cache_inputs?: string[];
+};
+
+/** Latest full-eval summary written by scripts/eval_all.py. */
+export type LatestEvalSummary = {
+  run_id: string;
+  arm: string;
+  case_count: number;
+  metrics: Record<string, number>;
+  report_path: string | null;
+  version_snapshot: EvalVersionSnapshot;
+};

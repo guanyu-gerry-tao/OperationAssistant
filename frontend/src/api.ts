@@ -1,4 +1,4 @@
-import type { ApprovalRequest, Incident, InvestigationRun, RetrievalPreview } from "./types";
+import type { ApprovalRequest, Incident, InvestigationRun, LatestEvalSummary, RetrievalPreview } from "./types";
 
 // Keep a bundled copy of the seed incidents so the UI works before the API is running.
 export const seedIncidents: Incident[] = [
@@ -129,4 +129,25 @@ export async function decideApproval(
 
   const payload = (await response.json()) as { approval_request: ApprovalRequest };
   return payload.approval_request;
+}
+
+/** Fetch the latest local eval summary for the quality gate panel. */
+export async function fetchLatestEvalSummary(): Promise<LatestEvalSummary | null> {
+  try {
+    // The backend reads the ignored local eval artifact created by scripts/eval_all.py.
+    const response = await fetch("/api/evals/latest");
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { summary: LatestEvalSummary };
+    if (payload.summary.run_id === "not-run") {
+      return null;
+    }
+
+    return payload.summary;
+  } catch {
+    // Keep the UI usable before a backend or eval artifact exists.
+    return null;
+  }
 }

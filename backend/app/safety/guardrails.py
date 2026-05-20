@@ -9,6 +9,9 @@ PROMPT_INJECTION_PATTERNS = [
         r"ignore (all )?(previous|prior) instructions",
         r"ignore (the )?(above|previous|prior) instruction",
         r"reveal (the )?(hidden )?(system|developer) prompt",
+        r"\bprint (the )?(developer|system) message\b",
+        r"\boutput (secrets|hidden instructions)\b",
+        r"\bforget (the )?(guardrails|instructions|policies)\b",
         r"disable (the )?(guardrails|safety)",
         r"jailbreak",
     ]
@@ -17,7 +20,7 @@ PROMPT_INJECTION_PATTERNS = [
 HIGH_RISK_ACTION_TERMS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
-        r"\b(replay|rerun|restart|rollback|roll\s+back|deploy|refund)\b",
+        r"\b(replay|rerun|restart|rollback|roll\s+back|deploy|refund|disable|repair|purge|execute)\b",
     ]
 ]
 
@@ -34,6 +37,7 @@ UNSAFE_ACTION_MODIFIERS = [
         r"\b(now|immediately|automatically)\b",
         r"\b(execute|perform|apply|do it|run it)\b",
         r"\bwithout (review|approval|waiting)\b",
+        r"\b(skip|bypass) (review|approval)\b",
     ]
 ]
 
@@ -41,6 +45,7 @@ PII_PATTERNS = [
     ("email", re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE), "[REDACTED_EMAIL]"),
     ("card", re.compile(r"\b(?:\d[ -]*?){13,16}\b"), "[REDACTED_CARD]"),
     ("ssn", re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[REDACTED_SSN]"),
+    ("phone", re.compile(r"\b\d{3}-\d{3}-\d{4}\b"), "[REDACTED_PHONE]"),
 ]
 
 
@@ -133,11 +138,11 @@ def _detect_unsafe_action_request(text: str) -> bool:
 
     normalized_text = text.strip().lower()
     starts_with_high_risk_action = re.match(
-        r"^(please\s+)?(replay|rerun|restart|rollback|roll\s+back|deploy|refund|retry)\b",
+        r"^(please\s+)?(replay|rerun|restart|rollback|roll\s+back|deploy|refund|retry|disable|repair|purge|execute)\b",
         normalized_text,
     ) is not None
     asks_to_perform_high_risk_action = re.search(
-        r"\b(can you|could you|please|go ahead and)\s+(replay|rerun|restart|rollback|roll\s+back|deploy|refund|retry)\b",
+        r"\b(can you|could you|please|go ahead and)\s+(replay|rerun|restart|rollback|roll\s+back|deploy|refund|retry|disable|repair|purge|execute)\b",
         normalized_text,
     ) is not None
     if starts_with_high_risk_action or asks_to_perform_high_risk_action:

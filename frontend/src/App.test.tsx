@@ -314,4 +314,53 @@ describe("App", () => {
 
     expect(await screen.findByText("Approval approved")).toBeInTheDocument();
   });
+
+  it("shows the latest eval run summary returned by the API", async () => {
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url.startsWith("/api/incidents")) {
+        return Promise.resolve({
+          ok: false,
+          json: async () => ({ incidents: [] }),
+        });
+      }
+      if (url === "/api/evals/latest") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            summary: {
+              run_id: "eval-run-ui",
+              arm: "improved",
+              case_count: 12,
+              metrics: {
+                retrieval_precision: 1,
+                tool_selection_accuracy: 1,
+                grounded_answer_rate: 1,
+                hallucination_rate: 0,
+                cache_hit_rate: 0.5,
+              },
+              report_path: "evals/results/full/full_improved.md",
+              version_snapshot: {
+                prompt_versions: {
+                  investigation_answer: "investigation_answer_v1",
+                },
+                model_profile: "deterministic-local-v1",
+              },
+            },
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: false,
+        json: async () => ({}),
+      });
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByText("Latest eval run")).toBeInTheDocument();
+    expect(screen.getByText("eval-run-ui")).toBeInTheDocument();
+    expect(screen.getByText("Grounded answer rate")).toBeInTheDocument();
+    expect(screen.getByText("investigation_answer_v1")).toBeInTheDocument();
+  });
 });

@@ -18,15 +18,19 @@ OperationAssistant is an AI operations assistant foundation for incident investi
 - Human approval requests and audit endpoints for action-like simulated remediation plans.
 - Frontend guardrail state and approval modal for approval-required investigation results.
 - Safety eval runner with `monitor_only` baseline and `enforce` improved mode.
+- Unified full eval runner with a 100+ labeled quality dataset, baseline/improved arms, independent deterministic eval judge, and generated JSON/Markdown reports.
+- Prompt, model, tool, guardrail, and cache-input version metadata attached to full eval reports.
+- Latest eval summary API and frontend quality summary panel for the most recent local full eval run.
+- Lightweight append-only feedback log helpers for citation, tool-choice, safety, and missing-fact labels.
 - Docker Compose services for PostgreSQL with pgvector and Redis.
 - PostgreSQL migrations for foundation tables plus document and chunk tables with pgvector embeddings.
 - Local runbook corpus under `data/runbooks/` and labeled retrieval eval cases under `evals/retrieval/`.
 - Labeled tool-use eval cases under `evals/tool_use/` and labeled safety cases under `evals/safety/`.
-- Backend and frontend tests wired into GitHub Actions.
+- Backend, frontend, and fast eval smoke checks wired into GitHub Actions.
 
 ## Planned Later Capabilities
 
-- Add semantic caching, async job handling, prompt/version tracking, and richer evaluation summary views.
+- Add durable semantic caching, async job handling, and richer trend dashboards.
 
 ## Planned Tech Stack
 
@@ -97,4 +101,18 @@ Run safety evals:
 ```bash
 .venv/bin/python scripts/eval_safety.py --safety-mode monitor_only
 .venv/bin/python scripts/eval_safety.py --safety-mode enforce
+```
+
+Run the unified quality gate:
+
+```bash
+.venv/bin/python scripts/eval_all.py --arm baseline
+.venv/bin/python scripts/eval_all.py --arm improved
+.venv/bin/python scripts/eval_all.py --arm improved --limit 12 --check-thresholds
+```
+
+Run the fast CI-style eval smoke locally:
+
+```bash
+make eval-smoke
 ```

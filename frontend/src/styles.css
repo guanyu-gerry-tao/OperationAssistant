@@ -167,7 +167,8 @@ button {
 
 .detail-facts div,
 .investigation-panel,
-.retrieval-panel {
+.retrieval-panel,
+.eval-summary-panel {
   background: #ffffff;
   border: 1px solid #d8dfda;
   border-radius: 8px;
@@ -187,7 +188,8 @@ button {
 }
 
 .investigation-panel,
-.retrieval-panel {
+.retrieval-panel,
+.eval-summary-panel {
   max-width: 880px;
 }
 
@@ -218,6 +220,60 @@ button {
 
 .retrieval-panel {
   margin-top: 20px;
+}
+
+.eval-summary-panel {
+  margin-bottom: 20px;
+}
+
+.eval-run-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.eval-run-meta span {
+  color: #5f6b65;
+}
+
+.quality-metric-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.quality-metric {
+  background: #f8faf7;
+  border: 1px solid #d8dfda;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  min-height: 72px;
+  padding: 12px;
+}
+
+.quality-metric span,
+.version-strip span {
+  color: #5f6b65;
+  font-size: 12px;
+}
+
+.quality-metric strong {
+  font-size: 20px;
+}
+
+.version-strip {
+  align-items: center;
+  background: #f3f7f4;
+  border: 1px solid #dce5df;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
 }
 
 .retrieval-controls,
@@ -501,7 +557,8 @@ button {
 
   .workspace-grid,
   .detail-facts,
-  .timeline-grid {
+  .timeline-grid,
+  .quality-metric-grid {
     grid-template-columns: 1fr;
   }
 

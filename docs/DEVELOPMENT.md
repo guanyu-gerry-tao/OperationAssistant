@@ -11,7 +11,8 @@ OperationAssistant has a runnable local foundation. This guide records the publi
 - Runbook retrieval data is loaded from Markdown files under `data/runbooks/`.
 - Read-only investigation tools use curated sample records from `data/seeds/tool_sample_records.json`.
 - Safety guardrails run before investigation data enters retrieval, tools, trace, or answer text.
-- Approval gates are implemented for action-like simulated requests. Semantic cache, async jobs, live LLM calls, and eval dashboards are still planned.
+- Approval gates are implemented for action-like simulated requests.
+- The M5 quality gate includes a unified full eval runner, 100+ labeled cases, prompt/version metadata, a latest-run summary API/UI, and lightweight feedback logging. Durable semantic cache, async jobs, live LLM calls, and richer trend dashboards are still planned.
 
 ## Setup
 
@@ -74,9 +75,11 @@ Current checks:
 .venv/bin/python -m pytest tests/backend -q
 npm --prefix frontend test
 npm --prefix frontend run build
+.venv/bin/python scripts/eval_all.py --arm baseline --limit 12 --output-dir evals/tmp/ci-baseline --check-thresholds
+.venv/bin/python scripts/eval_all.py --arm improved --limit 12 --output-dir evals/tmp/ci-improved --check-thresholds
 ```
 
-`make test` runs the same current checks.
+`make test` runs backend/frontend checks. `make eval-smoke` runs the fast baseline/improved eval smoke used by CI.
 
 Retrieval eval commands:
 
@@ -104,6 +107,15 @@ Safety eval commands:
 ```
 
 The safety eval runner writes local JSON and Markdown artifacts under `evals/results/safety/`. It reports decision accuracy, unsafe-pass rate, PII leak count, approval-required coverage, and latency for the current labeled safety cases.
+
+Unified full eval commands:
+
+```bash
+.venv/bin/python scripts/eval_all.py --arm baseline
+.venv/bin/python scripts/eval_all.py --arm improved
+```
+
+The unified runner uses `evals/datasets/full_quality_cases.json` and writes generated JSON, Markdown, and `latest_summary.json` artifacts under `evals/results/full/`. It reports retrieval precision, citation coverage, tool-selection accuracy, tool-argument accuracy, grounded-answer rate, grounding-failure rate, hallucination proxy rate, safety decision accuracy, unsafe-pass rate, PII leak count, approval-required coverage, cache hit rate, latency, and token-cost estimate. The latest summary endpoint reads the generated `latest_summary.json` so the frontend can display the newest local quality gate run. Add `--check-thresholds` for CI-style smoke thresholds.
 
 ## Retrieval Development Notes
 
@@ -134,6 +146,15 @@ The safety eval runner writes local JSON and Markdown artifacts under `evals/res
 - Unsafe replay/action requests become approval-required results in `enforce` mode.
 - Approval requests can be approved or rejected through `/api/approvals/{approval_id}/approve` and `/api/approvals/{approval_id}/reject`.
 - Approval audit logs are in-memory for the current local implementation, so they are suitable for demo and tests but not durable production storage.
+
+## Eval Quality Gate Notes
+
+- The full dataset covers retrieval, tool use, safety, grounded-answer, and cache cases.
+- The offline eval judge scores expected sources, expected facts, and expected tools from labels. It does not reuse product verifier status as the only groundedness signal.
+- The default runtime path remains improved: hybrid retrieval, agent tools, runtime verifier, and enforced safety. Baseline arms exist for eval and debugging.
+- The cache metric in M5 is an eval-arm semantic-cache check built from normalized query, actual retrieved context ids, prompt version, and safety mode. Durable Redis-backed runtime caching is still a later capability.
+- Prompt/model/tool/guardrail version metadata is stored in `backend/app/prompts/registry.py` and copied into full eval reports.
+- Lightweight feedback helpers live in `backend/app/feedback/`; they provide a local JSONL loop for quality labels without becoming a production analytics system.
 
 ## PR And Milestone Workflow
 
