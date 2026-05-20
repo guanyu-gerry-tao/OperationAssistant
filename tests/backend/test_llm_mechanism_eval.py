@@ -111,6 +111,31 @@ def test_llm_eval_dry_run_writes_metrics_for_all_requested_fields(tmp_path: Path
     assert output_paths.markdown_path.exists()
 
 
+def test_llm_eval_cli_helpers_load_model_from_local_env(tmp_path: Path, monkeypatch) -> None:
+    """CLI helpers should support keeping the real model name in local .env."""
+
+    from scripts.eval_llm import _load_local_env_file, _resolve_model
+
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "\n".join(
+            [
+                "OPENAI_MODEL=gpt-test-model",
+                "OPENAI_API_KEY=sk-test-secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    _load_local_env_file(env_path)
+
+    assert _resolve_model(None) == "gpt-test-model"
+    assert _resolve_model("cli-model") == "cli-model"
+    assert "sk-test-secret" not in json.dumps({"model": _resolve_model(None)})
+
+
 def test_rag_tools_verifier_arm_records_product_verifier_separately() -> None:
     """Product verifier should be a runtime arm feature, not the offline eval judge."""
 

@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -187,6 +188,29 @@ def _build_provider(*, provider_name: str, api_key_env: str):
     if provider_name == "openai":
         return OpenAICompatibleProvider(api_key_env=api_key_env)
     raise ValueError("Unknown LLM provider")
+
+
+def _load_local_env_file(env_path: Path) -> None:
+    """Load simple KEY=VALUE lines from a local .env file without logging secrets."""
+
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        normalized_key = key.strip()
+        normalized_value = value.strip().strip('"').strip("'")
+        if normalized_key and normalized_key not in os.environ:
+            os.environ[normalized_key] = normalized_value
+
+
+def _resolve_model(cli_model: str | None) -> str | None:
+    """Resolve the model from CLI first, then OPENAI_MODEL in the local environment."""
+
+    return cli_model or os.environ.get("OPENAI_MODEL")
 
 
 def _resolve_arm_mechanisms(arm: str) -> ArmMechanisms:
@@ -927,11 +951,13 @@ def main() -> None:
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY")
     args = parser.parse_args()
 
-    model = args.model
+    _load_local_env_file(REPO_ROOT / ".env")
+
+    model = _resolve_model(args.model)
     if model is None and args.provider == "deterministic":
         model = "deterministic-local-v1"
     if model is None:
-        raise SystemExit("--model is required for real LLM providers")
+        raise SystemExit("--model is required for real LLM providers unless OPENAI_MODEL is set in .env")
 
     report = run_llm_eval(
         provider_name=args.provider,

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.config import get_settings
+from backend.app.config import Settings, get_settings
 from backend.app.main import app
 
 
@@ -29,9 +29,11 @@ def clear_settings_cache() -> None:
 
 
 def test_health_returns_not_configured_when_dependencies_are_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Remove dependency URLs so the health endpoint exercises the bootstrap state.
-    monkeypatch.delenv("OA_DATABASE_URL", raising=False)
-    monkeypatch.delenv("OA_REDIS_URL", raising=False)
+    # Force bootstrap settings so a developer's local .env cannot change this test.
+    monkeypatch.setattr(
+        "backend.app.main.get_settings",
+        lambda: Settings(database_url=None, redis_url=None),
+    )
 
     response = client.get("/health")
 
