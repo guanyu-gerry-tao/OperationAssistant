@@ -104,7 +104,7 @@ def run_llm_eval(
         )
 
     cases = json.loads(dataset_path.read_text(encoding="utf-8"))
-    selected_cases = cases[:limit] if limit is not None else cases
+    selected_cases, case_repeat_mode = _select_cases(cases=cases, limit=limit)
     version_snapshot = build_version_snapshot().to_dict()
     version_snapshot["model_profile"] = model
     version_snapshot["prompt_versions"]["llm_mechanism_eval"] = "llm_mechanism_eval_v1"
@@ -153,6 +153,9 @@ def run_llm_eval(
         "model": model,
         "arm": arm,
         "case_count": len(details),
+        "unique_case_count": len({str(case["id"]) for case in selected_cases}),
+        "dataset_case_count": len(cases),
+        "case_repeat_mode": case_repeat_mode,
         "temperature": temperature,
         "timeout_seconds": timeout_seconds,
         "max_cost_usd": max_cost_usd,
@@ -188,6 +191,21 @@ def _build_provider(*, provider_name: str, api_key_env: str):
     if provider_name == "openai":
         return OpenAICompatibleProvider(api_key_env=api_key_env)
     raise ValueError("Unknown LLM provider")
+
+
+def _select_cases(*, cases: list[dict[str, Any]], limit: int | None) -> tuple[list[dict[str, Any]], str]:
+    """Select eval cases, cycling the labeled set only when a larger stability run asks for it."""
+
+    if limit is None:
+        return cases, "full_dataset"
+    if limit <= len(cases):
+        return cases[:limit], "truncated_to_limit"
+
+    selected_cases = [
+        cases[index % len(cases)]
+        for index in range(limit)
+    ]
+    return selected_cases, "cycled_to_limit"
 
 
 def _load_local_env_file(env_path: Path) -> None:
@@ -245,6 +263,8 @@ def _new_counters() -> dict[str, float | list[float]]:
         "tool_count": 0.0,
         "tool_selection_hits": 0.0,
         "tool_argument_hits": 0.0,
+        "raw_tool_count": 0.0,
+        "raw_tool_selection_hits": 0.0,
         "grounding_count": 0.0,
         "grounded_hits": 0.0,
         "hallucination_hits": 0.0,
@@ -318,10 +338,11 @@ def _score_case(
 
     # Tool calling is only available in the tool arms.
     selected_tools: list[ToolCall] = []
+    raw_selected_tools: list[ToolCall] = []
     tool_results: list[ToolResult] = []
     tool_plan_response: LLMResponse | None = None
     if mechanisms.use_tools and incident_id:
-        selected_tools, tool_plan_response = _select_tool_calls(
+        selected_tools, raw_selected_tools, tool_plan_response = _select_tool_calls(
             provider=provider,
             provider_name=provider_name,
             model=model,
@@ -335,7 +356,12 @@ def _score_case(
                 tool_results.append(execute_tool(tool_call))
             except ValueError as exc:
                 detail.setdefault("tool_errors", []).append(str(exc))
-    _score_tool_fields(case=case, selected_tools=selected_tools, detail=detail)
+    _score_tool_fields(
+        case=case,
+        selected_tools=selected_tools,
+        raw_selected_tools=raw_selected_tools,
+        detail=detail,
+    )
 
     # Cache arms reuse answers only after retrieval context and prompt version are known.
     cache_hit = False
@@ -484,6 +510,7 @@ def _score_tool_fields(
     *,
     case: dict[str, Any],
     selected_tools: list[ToolCall],
+    raw_selected_tools: list[ToolCall],
     detail: dict[str, Any],
 ) -> None:
     """Attach tool-selection and tool-argument metrics."""
@@ -491,9 +518,13 @@ def _score_tool_fields(
     expected_tools = list(case.get("expected_tools", []))
     expected_arguments = dict(case.get("expected_arguments", {}))
     selected_tool_names = [tool_call.tool_name for tool_call in selected_tools]
+    raw_selected_tool_names = [tool_call.tool_name for tool_call in raw_selected_tools]
     detail["selected_tools"] = selected_tool_names
+    detail["raw_selected_tools"] = raw_selected_tool_names
     detail["tool_count"] = 1 if expected_tools else 0
     detail["tool_selection_hit"] = selected_tool_names == expected_tools if expected_tools else False
+    detail["raw_tool_count"] = 1 if expected_tools else 0
+    detail["raw_tool_selection_hit"] = raw_selected_tool_names == expected_tools if expected_tools else False
     tool_argument_hit = bool(selected_tools) and all(
         tool_call.arguments.get(key) == value
         for tool_call in selected_tools
@@ -571,7 +602,7 @@ def _select_tool_calls(
     question: str,
     temperature: float,
     timeout_seconds: float,
-) -> tuple[list[ToolCall], LLMResponse | None]:
+) -> tuple[list[ToolCall], list[ToolCall], LLMResponse | None]:
     """Ask the provider to choose function calls, with deterministic dry-run support."""
 
     prompt = _build_tool_plan_prompt(incident_id=incident_id, question=question)
@@ -587,11 +618,22 @@ def _select_tool_calls(
     calls = _parse_tool_calls(response.content)
     if provider_name == "deterministic" and not calls:
         calls = _deterministic_tool_calls(incident_id=incident_id, question=question)
-    return calls, response
+    routed_calls = _apply_tool_routing_policy(incident_id=incident_id, question=question, calls=calls)
+    return routed_calls, calls, response
 
 
 def _build_tool_plan_prompt(*, incident_id: str, question: str) -> str:
     """Build the function-calling prompt for real providers."""
+
+    incident = get_seed_incident(incident_id)
+    incident_lines: list[str] = []
+    if incident is not None:
+        incident_lines = [
+            f"service: {incident['service']}",
+            f"likely_area: {incident['likely_area']}",
+            f"symptom: {incident['symptom']}",
+            f"customer_impact: {incident['customer_impact']}",
+        ]
 
     return "\n".join(
         [
@@ -599,10 +641,123 @@ def _build_tool_plan_prompt(*, incident_id: str, question: str) -> str:
             "Use only these tool schemas:",
             json.dumps(list_function_schemas(), indent=2),
             f"Incident id: {incident_id}",
+            "Incident routing context:",
+            *incident_lines,
+            "Routing hints:",
+            "Use get_failed_events for checkout-workflow, workflow retry, payment timeout, or failed event questions.",
+            "Use get_service_metrics for inventory-sync validation, metrics, error-rate, feed, or availability questions.",
+            "Use get_trace_like_records for notification-worker latency, queue, worker, or trace questions.",
             f"Question: {question}",
             "Use get_incident_summary first. Add at most one domain evidence tool.",
         ]
     )
+
+
+def _apply_tool_routing_policy(
+    *,
+    incident_id: str,
+    question: str,
+    calls: list[ToolCall],
+) -> list[ToolCall]:
+    """Repair incompatible model-selected domain tools using incident routing context."""
+
+    summary_call = ToolCall(
+        tool_name="get_incident_summary",
+        arguments={"incident_id": incident_id},
+        reason="Ground the incident context first.",
+    )
+    preferred_domain_tool = _preferred_domain_tool(incident_id=incident_id, question=question)
+    if preferred_domain_tool is None:
+        return [summary_call]
+
+    existing_domain_call = next(
+        (
+            call
+            for call in calls
+            if call.tool_name != "get_incident_summary"
+        ),
+        None,
+    )
+    if existing_domain_call is not None and existing_domain_call.tool_name == preferred_domain_tool:
+        return [
+            summary_call,
+            ToolCall(
+                tool_name=existing_domain_call.tool_name,
+                arguments={"incident_id": incident_id},
+                reason=existing_domain_call.reason,
+            ),
+        ]
+
+    return [
+        summary_call,
+        ToolCall(
+            tool_name=preferred_domain_tool,
+            arguments={"incident_id": incident_id},
+            reason=_routing_policy_reason(preferred_domain_tool),
+        ),
+    ]
+
+
+def _preferred_domain_tool(*, incident_id: str, question: str) -> str | None:
+    """Return the domain evidence tool implied by incident metadata and query intent."""
+
+    if not _asks_for_domain_evidence(question):
+        return None
+
+    incident = get_seed_incident(incident_id)
+    searchable_parts = [question.lower()]
+    if incident is not None:
+        searchable_parts.extend(
+            [
+                str(incident["service"]).lower(),
+                str(incident["likely_area"]).lower(),
+                str(incident["symptom"]).lower(),
+            ]
+        )
+    searchable = " ".join(searchable_parts)
+    if any(term in searchable for term in ["inventory", "feed", "validation", "availability", "metric", "error rate"]):
+        return "get_service_metrics"
+    if any(term in searchable for term in ["notification", "queue", "latency", "worker", "trace"]):
+        return "get_trace_like_records"
+    if any(term in searchable for term in ["workflow", "retry", "payment", "checkout", "failed event"]):
+        return "get_failed_events"
+    return None
+
+
+def _asks_for_domain_evidence(question: str) -> bool:
+    """Return whether the question needs a domain evidence tool beyond incident summary."""
+
+    normalized_question = question.lower()
+    summary_terms = ["summary", "overview", "current incident", "context"]
+    evidence_terms = [
+        "why",
+        "evidence",
+        "record",
+        "metric",
+        "trace",
+        "failed",
+        "diagnose",
+        "investigate",
+        "validation",
+        "latency",
+        "queue",
+        "retry",
+        "stale",
+        "error",
+    ]
+    has_summary_intent = any(term in normalized_question for term in summary_terms)
+    has_evidence_intent = any(term in normalized_question for term in evidence_terms)
+    return has_evidence_intent or not has_summary_intent
+
+
+def _routing_policy_reason(tool_name: str) -> str:
+    """Explain why local routing policy selected a repaired domain tool."""
+
+    if tool_name == "get_service_metrics":
+        return "Routing policy selected service metrics for inventory validation evidence."
+    if tool_name == "get_trace_like_records":
+        return "Routing policy selected trace-like records for notification latency evidence."
+    return "Routing policy selected failed events for workflow retry evidence."
 
 
 def _parse_tool_calls(content: str) -> list[ToolCall]:
@@ -793,6 +948,10 @@ def _add_detail_to_counters(counters: dict[str, float | list[float]], detail: di
     counters["tool_argument_hits"] = float(counters["tool_argument_hits"]) + (
         1.0 if detail.get("tool_argument_hit") else 0.0
     )
+    counters["raw_tool_count"] = float(counters["raw_tool_count"]) + float(detail.get("raw_tool_count", 0))
+    counters["raw_tool_selection_hits"] = float(counters["raw_tool_selection_hits"]) + (
+        1.0 if detail.get("raw_tool_selection_hit") else 0.0
+    )
     counters["grounding_count"] = float(counters["grounding_count"]) + float(detail.get("grounding_count", 0))
     counters["grounded_hits"] = float(counters["grounded_hits"]) + (1.0 if detail.get("grounded_hit") else 0.0)
     counters["hallucination_hits"] = float(counters["hallucination_hits"]) + (
@@ -842,6 +1001,10 @@ def _format_metrics(counters: dict[str, float | list[float]]) -> dict[str, float
             float(counters["tool_count"]),
         ),
         "tool_argument_accuracy": _safe_rate(float(counters["tool_argument_hits"]), float(counters["tool_count"])),
+        "raw_tool_selection_accuracy": _safe_rate(
+            float(counters["raw_tool_selection_hits"]),
+            float(counters["raw_tool_count"]),
+        ),
         "grounded_answer_rate": _safe_rate(float(counters["grounded_hits"]), float(counters["grounding_count"])),
         "hallucination_proxy_rate": _safe_rate(
             float(counters["hallucination_hits"]),

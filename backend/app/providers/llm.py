@@ -1,7 +1,7 @@
 import os
 import re
 from dataclasses import asdict, dataclass
-from time import perf_counter
+from time import perf_counter, sleep
 from typing import Literal
 
 import httpx
@@ -186,6 +186,8 @@ class OpenAICompatibleProvider:
         base_url_env: str = "OPENAI_BASE_URL",
         default_base_url: str = "https://api.openai.com/v1",
         transport: httpx.BaseTransport | None = None,
+        max_retries: int = 2,
+        retry_backoff_seconds: float = 1.0,
     ) -> None:
         """Create a provider adapter that reads keys only from environment variables."""
 
@@ -193,6 +195,8 @@ class OpenAICompatibleProvider:
         self.base_url_env = base_url_env
         self.default_base_url = default_base_url.rstrip("/")
         self.transport = transport
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def is_configured(self) -> bool:
         """Return whether the API key environment variable is present."""
@@ -235,13 +239,11 @@ class OpenAICompatibleProvider:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        client_kwargs: dict[str, object] = {"timeout": timeout_seconds}
-        if self.transport is not None:
-            client_kwargs["transport"] = self.transport
-        with httpx.Client(**client_kwargs) as client:
-            response = client.post(f"{self._base_url()}/chat/completions", headers=headers, json=payload)
-            response.raise_for_status()
-            response_payload = response.json()
+        response_payload = self._post_with_retries(
+            headers=headers,
+            payload=payload,
+            timeout_seconds=timeout_seconds,
+        )
 
         choice = response_payload["choices"][0]
         content = str(choice.get("message", {}).get("content", ""))
@@ -263,6 +265,38 @@ class OpenAICompatibleProvider:
         """Return the configured base URL without trailing slash."""
 
         return os.environ.get(self.base_url_env, self.default_base_url).rstrip("/")
+
+    def _post_with_retries(
+        self,
+        *,
+        headers: dict[str, str],
+        payload: dict[str, object],
+        timeout_seconds: float,
+    ) -> dict[str, object]:
+        """Post one chat completion request, retrying transient transport failures."""
+
+        attempts = self.max_retries + 1
+        last_error: Exception | None = None
+        for attempt_index in range(attempts):
+            client_kwargs: dict[str, object] = {"timeout": timeout_seconds}
+            if self.transport is not None:
+                client_kwargs["transport"] = self.transport
+            try:
+                with httpx.Client(**client_kwargs) as client:
+                    response = client.post(f"{self._base_url()}/chat/completions", headers=headers, json=payload)
+                    response.raise_for_status()
+                    parsed = response.json()
+                    if isinstance(parsed, dict):
+                        return parsed
+                    raise RuntimeError("Provider returned a non-object JSON payload")
+            except (httpx.TimeoutException, httpx.TransportError) as exc:
+                last_error = exc
+                if attempt_index >= self.max_retries:
+                    raise
+                if self.retry_backoff_seconds > 0:
+                    sleep(self.retry_backoff_seconds)
+
+        raise RuntimeError("Provider request failed") from last_error
 
 
 def estimate_cost_usd(

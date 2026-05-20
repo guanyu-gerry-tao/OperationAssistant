@@ -69,6 +69,45 @@ def test_openai_compatible_provider_parses_chat_completion_without_exposing_key(
     assert "sk-test-secret" not in json.dumps(provider.safe_config_summary())
 
 
+def test_openai_compatible_provider_retries_transient_timeouts(monkeypatch) -> None:
+    """Long eval runs should survive one transient provider timeout."""
+
+    from backend.app.providers.llm import ChatMessage, OpenAICompatibleProvider
+
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise httpx.ReadTimeout("temporary read timeout", request=request)
+        return httpx.Response(
+            status_code=200,
+            json={
+                "choices": [{"message": {"content": "Recovered after retry."}}],
+                "usage": {"prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7},
+            },
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-secret")
+    provider = OpenAICompatibleProvider(
+        api_key_env="OPENAI_API_KEY",
+        transport=httpx.MockTransport(handler),
+        max_retries=1,
+        retry_backoff_seconds=0.0,
+    )
+
+    response = provider.complete(
+        model="unit-test-model",
+        messages=[ChatMessage(role="user", content="Retry once.")],
+        temperature=0.0,
+        timeout_seconds=1.0,
+    )
+
+    assert response.content == "Recovered after retry."
+    assert call_count == 2
+
+
 def test_llm_eval_dry_run_writes_metrics_for_all_requested_fields(tmp_path: Path) -> None:
     """Dry-run eval should prove the runner contract without pretending to be real LLM output."""
 
@@ -208,3 +247,96 @@ def test_safety_and_cache_eval_arms_change_only_their_mechanism() -> None:
     assert cache_off["metrics"]["cache_hit_rate"] == 0.0
     assert cache_on["metrics"]["cache_hit_rate"] > 0.0
     assert cache_on["quality_claim_allowed"] is False
+
+
+def test_tool_plan_prompt_includes_incident_routing_context() -> None:
+    """Tool planning should include service and likely-area signals before model routing."""
+
+    from scripts.eval_llm import _build_tool_plan_prompt
+
+    prompt = _build_tool_plan_prompt(
+        incident_id="INC-1002",
+        question="why did inventory validation errors increase",
+    )
+
+    assert "service: inventory-sync" in prompt
+    assert "likely_area: partner feed validation" in prompt
+    assert "Use get_service_metrics for inventory-sync validation, metrics, error-rate, feed, or availability questions." in prompt
+
+
+def test_tool_routing_repair_corrects_inventory_failed_events_choice() -> None:
+    """Local routing policy should repair incompatible raw model choices before execution."""
+
+    from backend.app.tools.models import ToolCall
+    from scripts.eval_llm import _apply_tool_routing_policy
+
+    raw_calls = [
+        ToolCall(
+            tool_name="get_incident_summary",
+            arguments={"incident_id": "INC-1002"},
+            reason="Ground context.",
+        ),
+        ToolCall(
+            tool_name="get_failed_events",
+            arguments={"incident_id": "INC-1002"},
+            reason="The question mentions errors.",
+        ),
+    ]
+
+    repaired = _apply_tool_routing_policy(
+        incident_id="INC-1002",
+        question="why did inventory validation errors increase",
+        calls=raw_calls,
+    )
+
+    assert [call.tool_name for call in repaired] == ["get_incident_summary", "get_service_metrics"]
+    assert repaired[1].reason == "Routing policy selected service metrics for inventory validation evidence."
+
+
+def test_eval_limit_can_cycle_dataset_for_large_stability_runs(tmp_path: Path) -> None:
+    """Large eval runs may repeat the current labeled set but must report that honestly."""
+
+    from scripts.eval_llm import run_llm_eval
+
+    dataset_path = tmp_path / "small_cases.json"
+    dataset_path.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "SMALL-001",
+                    "category": "retrieval",
+                    "query": "checkout retry timeout",
+                    "expected_sources": ["RB-1001"],
+                },
+                {
+                    "id": "SMALL-002",
+                    "category": "retrieval",
+                    "query": "inventory validation errors",
+                    "expected_sources": ["RB-1002"],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = run_llm_eval(
+        provider_name="deterministic",
+        model="deterministic-local-v1",
+        arm="rag_only",
+        limit=5,
+        dataset_path=dataset_path,
+        temperature=0.0,
+        timeout_seconds=5.0,
+        max_cost_usd=0.25,
+    )
+
+    assert report["case_count"] == 5
+    assert report["unique_case_count"] == 2
+    assert report["case_repeat_mode"] == "cycled_to_limit"
+    assert [case["id"] for case in report["cases"]] == [
+        "SMALL-001",
+        "SMALL-002",
+        "SMALL-001",
+        "SMALL-002",
+        "SMALL-001",
+    ]
