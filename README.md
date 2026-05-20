@@ -1,48 +1,97 @@
 # OperationAssistant
 
-OperationAssistant is an AI operations assistant foundation for incident investigation. It is designed to grow into a system that combines retrieval, diagnostic tool use, evidence checks, and traceable investigation steps so an operator can understand why a curated service or workflow incident happened and what a safe next action would be.
+OperationAssistant is an AI operations assistant for investigating service incidents with retrieval, read-only diagnostic tools, evidence checks, safety controls, and evaluation reports.
 
-## Current Capabilities
+The project is designed around a practical operations workflow: an engineer asks why an incident happened, the assistant retrieves relevant runbooks, calls diagnostic tools, checks whether the answer is grounded, and presents traceable evidence before suggesting a safe next step.
 
-- FastAPI backend with health and curated incident seed endpoints.
-- Retrieval preview endpoint at `/api/retrieval` for runbook chunks and source citations.
-- Two runnable retrieval strategies:
-  - `lexical` for a simple benchmark baseline.
-  - `hybrid_rerank_rewrite` as the default improved path with deterministic embeddings, query rewriting, metadata filtering, and lightweight reranking.
-- React and TypeScript frontend that shows seed incidents, investigation results, and a retrieval preview citation panel.
-- Synchronous investigation endpoint at `/api/investigations` with `rag_only` baseline mode and default `agent_tools` mode.
-- Read-only function-calling tools for incident summaries, service metrics, failed events, and trace-like sample records, with JSON Schema compatible function contracts.
-- Product verifier checks that final answers reference retrieved citations and tool outputs.
-- Frontend investigation view with a final answer, tool call timeline, trace viewer, verifier badge, and citation cards.
-- Safety guardrails for prompt injection detection, PII redaction, unsafe replay/action classification, and default `safety_mode=enforce`.
-- Human approval requests and audit endpoints for action-like simulated remediation plans.
-- Frontend guardrail state and approval modal for approval-required investigation results.
-- Safety eval runner with `monitor_only` baseline and `enforce` improved mode.
-- Unified full eval runner with a 100+ labeled quality dataset, baseline/improved arms, independent deterministic eval judge, and generated JSON/Markdown reports.
-- Prompt, model, tool, guardrail, and cache-input version metadata attached to full eval reports.
-- Latest eval summary API and frontend quality summary panel for the most recent local full eval run.
-- Lightweight append-only feedback log helpers for citation, tool-choice, safety, and missing-fact labels.
-- Docker Compose services for PostgreSQL with pgvector and Redis.
-- PostgreSQL migrations for foundation tables plus document and chunk tables with pgvector embeddings.
-- Local runbook corpus under `data/runbooks/` and labeled retrieval eval cases under `evals/retrieval/`.
-- Labeled tool-use eval cases under `evals/tool_use/` and labeled safety cases under `evals/safety/`.
-- Backend, frontend, and fast eval smoke checks wired into GitHub Actions.
+## What It Demonstrates
 
-## Planned Later Capabilities
+- Python/FastAPI backend for incident investigation, retrieval, tool execution, verification, safety checks, approval requests, and eval reporting.
+- React/TypeScript frontend for seed incidents, investigation answers, citations, tool timelines, verifier status, approval flows, and quality summaries.
+- PostgreSQL with pgvector for document chunks and retrieval storage.
+- Redis-backed local infrastructure for cache and job-ready service wiring.
+- RAG workflows with lexical and hybrid retrieval modes, query rewriting, metadata filtering, deterministic embeddings, and reranking.
+- Function-calling style read-only tools with JSON Schema compatible contracts.
+- Guardrails for prompt injection detection, PII redaction, unsafe replay/action classification, permissions, and human approval gates.
+- Evaluation runners for retrieval, tool use, safety, full quality gates, and optional OpenAI-compatible LLM mechanism evaluations.
 
-- Add durable semantic caching, async job handling, and richer trend dashboards.
+## Architecture
 
-## Planned Tech Stack
+```text
+React Investigation UI
+        |
+        v
+FastAPI Backend
+        |
+        +--> Retrieval: runbook chunks + pgvector-backed storage
+        +--> Tool Executor: read-only incident, metric, failed-event, and trace tools
+        +--> Verifier: citation and tool-evidence checks
+        +--> Guardrails: prompt injection, PII, unsafe action classification
+        +--> Approval Flow: action-like plans require human approval
+        |
+        v
+Eval Runners: retrieval, investigation, safety, full quality, LLM mechanism
+```
+
+The default local workflow is safe by design: read-only tools can run automatically, action-like requests are converted into approval-required plans, and evals can run through deterministic providers or real OpenAI-compatible providers when configured through local environment variables.
+
+## Implemented Capabilities
+
+### Retrieval and Grounding
+
+- Runbook corpus under `data/runbooks/`.
+- Retrieval preview API for source citations.
+- `lexical` baseline retrieval mode.
+- `hybrid_rerank_rewrite` retrieval mode with deterministic embeddings, query rewriting, metadata filtering, and reranking.
+- Product verifier that checks final answers against retrieved citations and tool outputs.
+
+### Investigation Workflow
+
+- Synchronous investigation endpoint at `/api/investigations`.
+- `rag_only` baseline mode and default `agent_tools` mode.
+- Read-only diagnostic tools for incident summaries, service metrics, failed events, and trace-like sample records.
+- JSON Schema compatible tool contracts.
+- Frontend answer view with citations, tool call timeline, trace viewer, verifier badge, and final answer.
+
+### Safety and Approval
+
+- Prompt injection detection.
+- PII redaction.
+- Unsafe replay/action classification.
+- Permission checks for read-only, planning, and action-like requests.
+- Human approval requests for simulated remediation plans.
+- Audit endpoints and replayable traces for investigation review.
+
+### Evaluation
+
+- Retrieval eval cases under `evals/retrieval/`.
+- Tool-use eval cases under `evals/tool_use/`.
+- Safety eval cases under `evals/safety/`.
+- Unified full-quality eval runner with baseline and improved arms.
+- Independent deterministic eval judge for quality scoring.
+- Optional LLM-backed mechanism eval with deterministic and OpenAI-compatible provider modes.
+- Eval reports include prompt, model, tool, guardrail, cache-input, latency, cost, and metadata snapshots where available.
+
+## Validation
+
+The project includes backend tests, frontend checks, eval smoke tests, and provider-gated evaluation paths:
+
+- Pytest coverage for backend endpoints, retrieval, tools, verification, safety, and eval helpers.
+- Frontend build and UI checks for the investigation flow.
+- GitHub Actions for backend, frontend, and fast eval smoke checks.
+- Local eval runners for retrieval, investigation, safety, full quality, and LLM mechanism comparisons.
+
+The LLM mechanism eval can compare arms such as `llm_only`, `rag_only`, `rag_tools`, `rag_tools_verifier`, `safety_monitor_only`, `safety_enforce`, `cache_off`, and `cache_on`. Real provider calls are only used when keys are supplied through local environment variables; deterministic mode remains available for dry runs and CI-friendly checks.
+
+## Tech Stack
 
 - Backend: Python and FastAPI.
-- Frontend: React with TypeScript.
-- Data: PostgreSQL with pgvector, plus Redis for cache and background jobs.
-- Local infrastructure: Docker Compose for supporting services.
-- Quality and delivery: automated tests and GitHub Actions.
-
-## Current Status
-
-The current implementation is a runnable local foundation with benchmarkable runbook retrieval, source citations, read-only diagnostic tool calls, product verification, traceable investigation steps, safety guardrails, and human approval gates for simulated action-like requests. It does not include live LLM calls, real write actions, semantic caching, async jobs, or evaluation dashboards yet.
+- Frontend: React and TypeScript.
+- Data: PostgreSQL with pgvector, plus Redis for local cache/job infrastructure.
+- AI workflow: RAG, hybrid retrieval, reranking, function calling, verifier checks, guardrails, approval gates.
+- Evaluation: deterministic eval judge, OpenAI-compatible provider adapter, JSON/Markdown reports.
+- Infrastructure: Docker Compose.
+- Testing and delivery: pytest, frontend checks, GitHub Actions.
 
 ## Local Development
 
@@ -60,13 +109,13 @@ Start local data services:
 docker compose up -d postgres redis
 ```
 
-Start the backend and frontend development servers:
+Start backend and frontend development servers:
 
 ```bash
 make dev
 ```
 
-Fallback commands:
+Fallback backend/frontend commands:
 
 ```bash
 OA_DATABASE_URL=postgresql://operation_assistant:operation_assistant@127.0.0.1:15432/operation_assistant \
@@ -76,7 +125,7 @@ OA_REDIS_URL=redis://127.0.0.1:16379/0 \
 npm --prefix frontend run dev
 ```
 
-Run checks:
+Run the standard checks:
 
 ```bash
 make test
@@ -111,8 +160,46 @@ Run the unified quality gate:
 .venv/bin/python scripts/eval_all.py --arm improved --limit 12 --check-thresholds
 ```
 
-Run the fast CI-style eval smoke locally:
+Run the LLM mechanism eval in deterministic mode:
+
+```bash
+.venv/bin/python scripts/eval_llm.py --provider deterministic --arm rag_tools --limit 20
+```
+
+Run the LLM mechanism eval with an OpenAI-compatible provider:
+
+```bash
+OPENAI_API_KEY=<your-key> OPENAI_MODEL=<model-name> \
+.venv/bin/python scripts/eval_llm.py --provider openai --arm rag_tools --limit 20 --max-cost-usd 1.00
+```
+
+Run fast CI-style eval smoke locally:
 
 ```bash
 make eval-smoke
 ```
+
+## API Surface
+
+Core endpoints include:
+
+```text
+GET  /health
+GET  /api/incidents
+GET  /api/incidents/{incident_id}
+GET  /api/retrieval
+POST /api/investigations
+GET  /api/investigations/{trace_id}
+GET  /api/investigations/{trace_id}/trace
+GET  /api/evals/latest
+GET  /api/approvals/{approval_id}
+POST /api/approvals/{approval_id}/approve
+POST /api/approvals/{approval_id}/reject
+```
+
+## Documentation
+
+- `data/runbooks/` contains local runbook source material.
+- `evals/` contains labeled retrieval, tool-use, safety, and full-quality datasets.
+- `scripts/` contains retrieval, investigation, safety, full-quality, and LLM mechanism eval runners.
+- `backend/app/` contains retrieval, tool execution, verification, guardrails, approval, provider, and workflow modules.
