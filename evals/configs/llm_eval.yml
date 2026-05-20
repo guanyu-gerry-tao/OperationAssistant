@@ -1,0 +1,35 @@
+# M5.5 LLM mechanism eval default profile.
+# Secrets are never stored here. Real providers must read keys from local env or a secret manager.
+
+default_limit: 30
+default_temperature: 0.0
+default_timeout_seconds: 20
+default_max_cost_usd: 1.0
+dataset_path: evals/datasets/full_quality_cases.json
+default_output_dir: evals/results/llm
+
+providers:
+  deterministic:
+    model: deterministic-local-v1
+    real_llm_backed: false
+    purpose: CI sanity and dry-run only.
+  openai:
+    api_key_env: OPENAI_API_KEY
+    base_url_env: OPENAI_BASE_URL
+    model_required: true
+    real_llm_backed: true
+
+arms:
+  - llm_only
+  - rag_only
+  - rag_tools
+  - rag_tools_verifier
+  - safety_monitor_only
+  - safety_enforce
+  - cache_off
+  - cache_on
+
+notes:
+  - deterministic results must not be used as real AI quality claims.
+  - cache_on/cache_off are latency and token-cost comparison arms, not answer-quality claims.
+  - product verifier output is recorded separately from the offline eval judge.

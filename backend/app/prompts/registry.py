@@ -27,6 +27,7 @@ def build_version_snapshot() -> VersionSnapshot:
             "retrieval_query": "retrieval_query_rewrite_v1",
             "investigation_answer": "investigation_answer_v1",
             "approval_response": "approval_response_v1",
+            "llm_mechanism_eval": "llm_mechanism_eval_v1",
         },
         model_profile="deterministic-local-v1",
         tool_registry_version="sample_tools_v1",
